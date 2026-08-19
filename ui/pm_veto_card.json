@@ -1,0 +1,54 @@
+{
+  "type": "AdaptiveCard",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "🚨 Baseline Change Authorization Required",
+      "weight": "Bolder",
+      "size": "Medium",
+      "color": "Attention"
+    },
+    {
+      "type": "FactSet",
+      "facts": [
+        { "title": "Change ID:", "value": "${change_id}" },
+        { "title": "Target Record:", "value": "${target_table} -> ${record_id}" }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "**PRINCE2 Impact Assessment:**",
+      "wrap": true
+    },
+    {
+      "type": "TextBlock",
+      "text": "${prince2_impact_assessment}",
+      "wrap": true,
+      "isSubtle": true
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.Submit",
+      "title": "Approve Change",
+      "style": "positive",
+      "data": {
+        "action": "pm_veto_decision",
+        "decision": "approved",
+        "change_id": "${change_id}"
+      }
+    },
+    {
+      "type": "Action.Submit",
+      "title": "Reject",
+      "style": "destructive",
+      "data": {
+        "action": "pm_veto_decision",
+        "decision": "rejected",
+        "change_id": "${change_id}"
+      }
+    }
+  ]
+}

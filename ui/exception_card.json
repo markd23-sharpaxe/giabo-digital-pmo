@@ -1,0 +1,54 @@
+{
+  "type": "AdaptiveCard",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "⚠️ PRINCE2 Exception Raised",
+      "weight": "Bolder",
+      "size": "Medium",
+      "color": "Attention"
+    },
+    {
+      "type": "FactSet",
+      "facts": [
+        { "title": "Risk Category:", "value": "${risk_category}" },
+        { "title": "Severity:", "value": "${severity}" }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "**Description:**",
+      "wrap": true
+    },
+    {
+      "type": "TextBlock",
+      "text": "${description}",
+      "wrap": true,
+      "isSubtle": true
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.Submit",
+      "title": "Acknowledge",
+      "style": "positive",
+      "data": {
+        "action": "exception_decision",
+        "decision": "acknowledge",
+        "exception_id": "${exception_id}"
+      }
+    },
+    {
+      "type": "Action.Submit",
+      "title": "Escalate to Board",
+      "style": "destructive",
+      "data": {
+        "action": "exception_decision",
+        "decision": "escalate_to_board",
+        "exception_id": "${exception_id}"
+      }
+    }
+  ]
+}
