@@ -1,0 +1,66 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/copilot/plugin/v2.3/schema.json",
+  "schema_version": "v2.3",
+  "name_for_human": "GIABO Digital PMO",
+  "description_for_human": "Create projects, get governance briefs, and check plan usage for the GIABO Digital PMO Swarm.",
+  "namespace": "giaboDigitalPmo",
+  "functions": [
+    {
+      "name": "createProject",
+      "description": "Create a new PMO project for a tenant, optionally linking a SharePoint site ID and naming the digital employee persona that will represent this project in Teams.",
+      "capabilities": {
+        "response_semantics": {
+          "data_path": "$",
+          "properties": {
+            "title": "$.name",
+            "subtitle": "$.status"
+          },
+          "static_template": {
+            "file": "projectSetupCard.json"
+          }
+        }
+      }
+    },
+    {
+      "name": "getProjectBrief",
+      "description": "Get a structured markdown governance brief -- open risks, open actions, and the recent swarm agent audit log -- for a project.",
+      "capabilities": {
+        "response_semantics": {
+          "data_path": "$",
+          "properties": {
+            "title": "$.project_name"
+          }
+        }
+      }
+    },
+    {
+      "name": "getUsageTelemetry",
+      "description": "Get a tenant's plan tier, swarm health, active project count, and metered token/overage usage.",
+      "capabilities": {
+        "response_semantics": {
+          "data_path": "$",
+          "properties": {
+            "title": "$.organization_name",
+            "subtitle": "$.plan_tier"
+          }
+        }
+      }
+    }
+  ],
+  "runtimes": [
+    {
+      "type": "OpenApi",
+      "auth": {
+        "type": "None"
+      },
+      "spec": {
+        "url": "openapi.yaml"
+      },
+      "run_for_functions": [
+        "createProject",
+        "getProjectBrief",
+        "getUsageTelemetry"
+      ]
+    }
+  ]
+}

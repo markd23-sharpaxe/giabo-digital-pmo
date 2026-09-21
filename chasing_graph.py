@@ -157,7 +157,9 @@ def build_default_chasing_chat_agent(*, temperature: float = 0.40) -> Agent:
         model=os.environ["AZURE_OPENAI_DEPLOYMENT_NAME"],
         api_key=os.environ["AZURE_OPENAI_API_KEY"],
         azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+        # "preview", not a dated version -- see app_graph.py's build_default_*
+        # functions for why (Responses-API routing rejects dated versions).
+        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "preview"),
     )
     return Agent(
         client=client,

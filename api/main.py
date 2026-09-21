@@ -63,14 +63,19 @@ import os
 import sys
 import traceback
 from datetime import datetime, timezone
+from pathlib import Path
 
 from botbuilder.core import ConversationState, MemoryStorage, TurnContext
 from botbuilder.integration.aiohttp import CloudAdapter, ConfigurationBotFrameworkAuthentication
 from botbuilder.schema import Activity, ActivityTypes
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from api.bot import PMOBot
+from api.copilot import router as copilot_router
+from api.legal import router as legal_router
+from api.marketplace import router as marketplace_router
 from app_graph import (
     build_app_graph,
     build_default_agile_chat_agent,
@@ -260,6 +265,35 @@ CONVERSATION_STATE = ConversationState(MemoryStorage())
 BOT = PMOBot(CONVERSATION_STATE, _workflow, _checkpoint_storage)
 
 app = FastAPI(title="GIABO Digital PMO -- Teams Bot")
+
+# Declarative Agent Architecture Pivot: the standalone Jinja2 marketing
+# homepage/tenant-admin-dashboard (formerly `api/web.py`) is gone -- PMO
+# interaction now happens natively inside Microsoft 365 Copilot (see
+# `appPackage/`) and Microsoft Teams chat. `static/css/theme.css` is kept
+# mounted because `templates/landing.html`/`privacy.html`/`terms.html`
+# (Azure Marketplace's required post-purchase redirect + the legal URLs
+# Partner Center and `appPackage/manifest.json` both require) still use it.
+# Mounted by absolute path so it works regardless of the process's current
+# working directory (e.g. `uvicorn api.main:app` run from a different cwd
+# than the repo root).
+_STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
+# Microsoft 365 Copilot Declarative Agent API Bridge: POST
+# /api/projects/create, GET /api/projects/{projectId}/brief, GET
+# /api/usage/telemetry -- called directly by the `ai-plugin.json` OpenAPI
+# runtime described in `appPackage/openapi.yaml`. See `api/copilot.py`.
+app.include_router(copilot_router)
+
+# /privacy, /terms -- the two dashboard-era routes that survive the pivot
+# (required by Partner Center + appPackage/manifest.json). See `api/legal.py`.
+app.include_router(legal_router)
+
+# Microsoft Partner Center SaaS Fulfillment API v2: GET /marketplace/landing
+# (Partner Center's configured Landing Page URL) and POST/PATCH
+# /api/marketplace/webhook (its configured Webhook URL). See
+# `api/marketplace.py` for the full onboarding + resync flow.
+app.include_router(marketplace_router)
 
 
 @app.post("/api/messages")

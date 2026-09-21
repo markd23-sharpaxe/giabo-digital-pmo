@@ -87,6 +87,7 @@ from db_middleware import (
 )
 from maf_graph_state import (
     BlockerPayload,
+    ExtractedEntity,
     PendingChangePayload,
     PMOState,
     RiskEscalationPayload,
@@ -294,15 +295,26 @@ def _render_change_control_prompt(*, user_request: str) -> str:
     return template.replace("{user_request}", user_request)
 
 
-def _render_worker_prompt(prompt_path: Path, *, user_message: str, extracted_entities: Optional[dict]) -> str:
+def _render_worker_prompt(
+    prompt_path: Path, *, user_message: str, extracted_entities: Optional[list[ExtractedEntity]]
+) -> str:
     """Shared renderer for the three Tri-Framework specialist prompts
     (`pmp_worker.md` / `agile_worker.md` / `governance_worker.md`): all use
     the same two `# CONTEXT` placeholders. This is the first real consumer
     of `TriageRouterDecision.extracted_entities` -- defined in Phase 2, unread
     until now.
+
+    `extracted_entities` is a `list[ExtractedEntity]` (not a `dict`) -- see
+    `ExtractedEntity`'s docstring for why -- so it's collapsed back into a
+    plain `{key: value}` dict here purely for a compact, human-readable
+    prompt string; the worker prompts don't care which shape produced it.
     """
     template = prompt_path.read_text(encoding="utf-8")
-    entities_text = json.dumps(extracted_entities) if extracted_entities else "None provided"
+    entities_text = (
+        json.dumps({entity.key: entity.value for entity in extracted_entities})
+        if extracted_entities
+        else "None provided"
+    )
     return template.replace("{user_message}", user_message).replace("{extracted_entities}", entities_text)
 
 
@@ -1205,7 +1217,12 @@ def build_default_router_chat_agent(*, temperature: float = 0.30) -> Agent:
         model=os.environ["AZURE_OPENAI_DEPLOYMENT_NAME"],
         api_key=os.environ["AZURE_OPENAI_API_KEY"],
         azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+        # "preview", not a dated version -- the installed agent-framework-openai
+        # routes Azure calls through its Responses-API-based client, which
+        # rejects Chat-Completions-era dated api-versions (verified live:
+        # api_version=None/"preview" succeed, every dated version 400s with
+        # "API version not supported"). AZURE_OPENAI_API_VERSION still overrides.
+        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "preview"),
     )
     return Agent(
         client=client,
@@ -1223,7 +1240,12 @@ def build_default_change_control_chat_agent(*, temperature: float = 0.10) -> Age
         model=os.environ["AZURE_OPENAI_DEPLOYMENT_NAME"],
         api_key=os.environ["AZURE_OPENAI_API_KEY"],
         azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+        # "preview", not a dated version -- the installed agent-framework-openai
+        # routes Azure calls through its Responses-API-based client, which
+        # rejects Chat-Completions-era dated api-versions (verified live:
+        # api_version=None/"preview" succeed, every dated version 400s with
+        # "API version not supported"). AZURE_OPENAI_API_VERSION still overrides.
+        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "preview"),
     )
     return Agent(
         client=client,
@@ -1241,7 +1263,12 @@ def build_default_pmp_chat_agent(*, temperature: float = 0.15) -> Agent:
         model=os.environ["AZURE_OPENAI_DEPLOYMENT_NAME"],
         api_key=os.environ["AZURE_OPENAI_API_KEY"],
         azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+        # "preview", not a dated version -- the installed agent-framework-openai
+        # routes Azure calls through its Responses-API-based client, which
+        # rejects Chat-Completions-era dated api-versions (verified live:
+        # api_version=None/"preview" succeed, every dated version 400s with
+        # "API version not supported"). AZURE_OPENAI_API_VERSION still overrides.
+        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "preview"),
     )
     return Agent(
         client=client,
@@ -1259,7 +1286,12 @@ def build_default_agile_chat_agent(*, temperature: float = 0.35) -> Agent:
         model=os.environ["AZURE_OPENAI_DEPLOYMENT_NAME"],
         api_key=os.environ["AZURE_OPENAI_API_KEY"],
         azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+        # "preview", not a dated version -- the installed agent-framework-openai
+        # routes Azure calls through its Responses-API-based client, which
+        # rejects Chat-Completions-era dated api-versions (verified live:
+        # api_version=None/"preview" succeed, every dated version 400s with
+        # "API version not supported"). AZURE_OPENAI_API_VERSION still overrides.
+        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "preview"),
     )
     return Agent(
         client=client,
@@ -1277,7 +1309,12 @@ def build_default_governance_chat_agent(*, temperature: float = 0.10) -> Agent:
         model=os.environ["AZURE_OPENAI_DEPLOYMENT_NAME"],
         api_key=os.environ["AZURE_OPENAI_API_KEY"],
         azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+        # "preview", not a dated version -- the installed agent-framework-openai
+        # routes Azure calls through its Responses-API-based client, which
+        # rejects Chat-Completions-era dated api-versions (verified live:
+        # api_version=None/"preview" succeed, every dated version 400s with
+        # "API version not supported"). AZURE_OPENAI_API_VERSION still overrides.
+        api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "preview"),
     )
     return Agent(
         client=client,

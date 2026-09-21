@@ -178,6 +178,14 @@ CREATE TABLE projects (
 
     golden_thread_last_verified_at TIMESTAMPTZ,
 
+    -- Frontend Jinja2 Template Suite: the per-project "digital employee"
+    -- persona -- the display name/email the swarm presents as when it
+    -- posts to Teams/email for this project. Configured from the tenant
+    -- admin dashboard (templates/dashboard.html); both nullable so existing
+    -- projects created before this field existed remain valid.
+    digital_employee_name        TEXT,
+    digital_employee_email       TEXT,
+
     created_at                   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
 

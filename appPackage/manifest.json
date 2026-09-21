@@ -1,0 +1,36 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.19",
+  "version": "1.0.0",
+  "id": "d0343bec-439b-476f-9907-739e297fe7fb",
+  "developer": {
+    "name": "Rapid Viable Product LTD",
+    "websiteUrl": "https://giabo-pmo-backend-b9fmcxczhueje4gz.canadacentral-01.azurewebsites.net",
+    "privacyUrl": "https://giabo-pmo-backend-b9fmcxczhueje4gz.canadacentral-01.azurewebsites.net/privacy",
+    "termsOfUseUrl": "https://giabo-pmo-backend-b9fmcxczhueje4gz.canadacentral-01.azurewebsites.net/terms"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "GIABO Digital PMO",
+    "full": "GIABO Digital PMO Swarm -- Rapid Viable Product"
+  },
+  "description": {
+    "short": "Six autonomous agents, one governed outcome.",
+    "full": "A PRINCE2/Agile-grade digital PMO that sets up projects, reports on risks and actions, and tracks plan usage -- backed by an autonomous six-agent swarm and a real audit trail in Azure PostgreSQL, native to Microsoft 365 Copilot."
+  },
+  "accentColor": "#070B14",
+  "copilotAgents": {
+    "declarativeAgents": [
+      {
+        "id": "giaboDigitalPmo",
+        "file": "declarativeAgent.json"
+      }
+    ]
+  },
+  "validDomains": [
+    "giabo-pmo-backend-b9fmcxczhueje4gz.canadacentral-01.azurewebsites.net"
+  ]
+}

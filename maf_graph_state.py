@@ -21,6 +21,22 @@ from pydantic import BaseModel, Field
 # ---------------------------------------------------------
 # ROUTER SCHEMA
 # ---------------------------------------------------------
+class ExtractedEntity(BaseModel):
+    """One key/value pair the Router pulled out of the user's message (e.g.
+    key='task_id', value='TSK-002'). A `List[ExtractedEntity]`, not a
+    `Dict[str, Any]` -- Azure OpenAI's strict structured-output mode rejects
+    genuinely open-ended objects (verified live: 'additionalProperties is
+    required to be supplied and to be false' on a bare `Dict[str, Any]`
+    field, since strict mode can't validate arbitrary/unknown key names).
+    A list of well-defined `{key, value}` objects is fully strict-schema
+    compatible and round-trips to a dict just as easily downstream
+    (`app_graph._render_worker_prompt`).
+    """
+
+    key: str
+    value: str
+
+
 class TriageRouterDecision(BaseModel):
     next_node: Literal[
         "pmp_worker",
@@ -32,7 +48,7 @@ class TriageRouterDecision(BaseModel):
     ]
     reasoning: str
     update_vague_turns: bool
-    extracted_entities: Optional[Dict[str, Any]] = None
+    extracted_entities: Optional[List[ExtractedEntity]] = None
 
 
 # ---------------------------------------------------------

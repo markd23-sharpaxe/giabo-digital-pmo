@@ -1,0 +1,201 @@
+openapi: 3.0.3
+info:
+  title: GIABO Digital PMO -- Copilot API Bridge
+  description: >-
+    Backend operations for the GIABO Digital PMO Swarm's Microsoft 365
+    Copilot declarative agent: create a project, retrieve a governance
+    brief, and check plan usage. Implemented in api/copilot.py.
+  version: "1.0.0"
+servers:
+  # Real deployed FastAPI domain -- also present in manifest.json's
+  # validDomains.
+  - url: https://giabo-pmo-backend-b9fmcxczhueje4gz.canadacentral-01.azurewebsites.net
+paths:
+  /api/projects/create:
+    post:
+      operationId: createProject
+      summary: Create a new PMO project for a tenant.
+      description: >-
+        Creates a project scoped to tenant_id, optionally linking a real
+        SharePoint Site ID and naming the digital employee persona that
+        will represent this project in Teams. tenant_id may be omitted, in
+        which case the most recently active tenant is used automatically --
+        never ask a user for a raw tenant_id unless they already gave you one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCreateRequest"
+      responses:
+        "200":
+          description: The newly created project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectCreateResponse"
+        "404":
+          description: tenant_id does not exist.
+        "422":
+          description: name was empty or the request body failed validation.
+  /api/projects/brief:
+    get:
+      operationId: getProjectBrief
+      summary: Get a structured markdown governance brief for a project.
+      description: >-
+        Returns open risks, open actions, and the most recent swarm
+        agent-execution audit log entries for a project, as a single
+        markdown-formatted string. project_id may be omitted, in which case
+        the most recently active project is used automatically -- never ask
+        a user for a raw project_id unless they already gave you one.
+      parameters:
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The project's governance brief.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectBriefResponse"
+        "404":
+          description: project_id does not exist, or was omitted and no project exists to default to.
+  /api/usage/telemetry:
+    get:
+      operationId: getUsageTelemetry
+      summary: Get a tenant's plan tier, swarm health, and usage/overage tracking.
+      description: >-
+        tenant_id may be omitted, in which case the most recently active
+        tenant is used automatically -- never ask a user for a raw
+        tenant_id unless they already gave you one.
+      parameters:
+        - name: tenant_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The tenant's current usage telemetry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageTelemetryResponse"
+        "404":
+          description: tenant_id does not exist, or was omitted and no active tenant exists to default to.
+components:
+  schemas:
+    ProjectCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        tenant_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Omit to default to the most recently active tenant.
+        name:
+          type: string
+        sharepoint_site_id:
+          type: string
+          nullable: true
+        digital_employee_name:
+          type: string
+          nullable: true
+        digital_employee_email:
+          type: string
+          nullable: true
+    ProjectCreateResponse:
+      type: object
+      required:
+        - id
+        - tenant_id
+        - name
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum: [new, initiated]
+        sharepoint_site_id:
+          type: string
+          nullable: true
+        digital_employee_name:
+          type: string
+          nullable: true
+        digital_employee_email:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    ProjectBriefResponse:
+      type: object
+      required:
+        - project_id
+        - project_name
+        - markdown
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        project_name:
+          type: string
+        markdown:
+          type: string
+          description: Structured markdown roll-up of risks, actions, and the swarm audit log.
+    UsageTelemetryResponse:
+      type: object
+      required:
+        - tenant_id
+        - organization_name
+        - plan_tier
+        - swarm_status
+        - active_project_count
+        - raw_token_spend_usd
+        - monthly_token_allowance_usd
+        - billed_overage_usd
+        - is_overage
+      properties:
+        tenant_id:
+          type: string
+          format: uuid
+        organization_name:
+          type: string
+        plan_tier:
+          type: string
+          enum: [free_trial, paid_monthly]
+        swarm_status:
+          type: string
+          enum: [provisioning, active, trial_expired, suspended, cancelled]
+        active_project_count:
+          type: integer
+        raw_token_spend_usd:
+          type: number
+          format: double
+        monthly_token_allowance_usd:
+          type: number
+          format: double
+        billed_overage_usd:
+          type: number
+          format: double
+        is_overage:
+          type: boolean
+        trial_end_date:
+          type: string
+          format: date
+          nullable: true

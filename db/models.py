@@ -224,6 +224,12 @@ class Project(Base):
     eom_checkpoint_day: Mapped[Optional[int]] = mapped_column(SmallInteger)
     golden_thread_last_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
+    # Frontend Jinja2 Template Suite: per-project "digital employee" persona
+    # (display name/email the swarm presents as), configured from the
+    # tenant admin dashboard. See db/schema.sql for the full rationale.
+    digital_employee_name: Mapped[Optional[str]] = mapped_column(Text)
+    digital_employee_email: Mapped[Optional[str]] = mapped_column(Text)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -525,6 +531,8 @@ class ProjectBase(BaseModel):
     project_manager_name: Optional[str] = None
     project_manager_entra_id: Optional[uuid.UUID] = None
     eom_checkpoint_day: Optional[int] = Field(default=None, ge=1, le=31)
+    digital_employee_name: Optional[str] = None
+    digital_employee_email: Optional[str] = None
 
 
 class ProjectCreate(ProjectBase):

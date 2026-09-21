@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy Policy -- Rapid Viable Product{% endblock %}
+{% block meta_description %}Privacy Policy for the GIABO Digital PMO Swarm, operated by Rapid Viable Product LTD.{% endblock %}
+
+{% block content %}
+<div class="container-narrow legal" style="padding:56px 0 72px;">
+  <h1 style="font-size:1.9rem;">Privacy Policy</h1>
+  <p class="updated">Last updated: September 18, 2026</p>
+
+  <p>
+    This Privacy Policy explains how Rapid Viable Product LTD ("<strong>Rapid Viable Product</strong>",
+    "<strong>we</strong>", "<strong>us</strong>") collects, uses, and protects information in connection
+    with the GIABO Digital PMO Swarm (the "<strong>Service</strong>"), a Microsoft Teams-native
+    project-governance application distributed via the Microsoft Azure Marketplace.
+  </p>
+
+  <h2>1. Information We Collect</h2>
+  <p>We collect the minimum information necessary to operate the Service:</p>
+  <ul>
+    <li><strong>Subscription &amp; tenant data</strong> -- the Azure subscription ID, Azure AD (Entra ID)
+      customer tenant ID, organization name, and selected plan tier, provided by Microsoft's Partner
+      Center SaaS Fulfillment API when you activate the Service on the Azure Marketplace.</li>
+    <li><strong>Project data</strong> -- project names, baselines, SharePoint site identifiers, and the
+      document content the Service is granted access to via Microsoft Graph, strictly limited to the
+      permissions your administrator consents to.</li>
+    <li><strong>Conversation content</strong> -- messages sent to the digital employee in Microsoft
+      Teams, processed to extract task progress, risks, blockers, and change requests.</li>
+    <li><strong>Usage &amp; billing telemetry</strong> -- token consumption per agent invocation, used
+      solely to enforce your plan's usage allowance and for Azure Marketplace metering.</li>
+  </ul>
+
+  <h2>2. How We Use Information</h2>
+  <p>Information is used exclusively to: provision and operate your subscription; route your messages
+    to the correct specialist agent and write the resulting decisions back to your project record;
+    detect and prevent abuse of the Service's usage allowances; and provide support when requested.
+    We do not sell your information, and we do not use your project or conversation content to train
+    any model outside the scope of serving your own requests.</p>
+
+  <h2>3. Sub-processors</h2>
+  <p>Delivering the Service requires processing data through the following Microsoft sub-processors,
+    each operating under its own Microsoft data-processing terms:</p>
+  <ul>
+    <li><strong>Microsoft Azure OpenAI Service</strong> -- processes conversation content to produce
+      structured agent outputs (task updates, risk assessments, routing decisions).</li>
+    <li><strong>Microsoft Graph / SharePoint</strong> -- read access to the document libraries your
+      administrator explicitly grants consent to.</li>
+    <li><strong>Microsoft Bot Framework / Microsoft Teams</strong> -- transport for every message
+      exchanged with the digital employee.</li>
+    <li><strong>Microsoft Azure Marketplace / Partner Center</strong> -- subscription fulfillment,
+      billing, and metering.</li>
+  </ul>
+
+  <h2>4. Data Storage &amp; Location</h2>
+  <p>Tenant, project, and audit-trail data is stored in an Azure Database for PostgreSQL instance
+    operated by Rapid Viable Product. Data residency follows the Azure region in which that instance
+    is deployed; contact us if your organization has a specific residency requirement.</p>
+
+  <h2>5. Data Retention</h2>
+  <p>We retain subscription and project data for as long as your subscription is active, plus a
+    reasonable period afterward to satisfy accounting, audit, and legal obligations. You may request
+    deletion of your tenant's data by contacting us; some records (e.g. billing/metering history) may
+    be retained where required by law.</p>
+
+  <h2>6. Security</h2>
+  <p>Access to the Service's Microsoft Graph permissions and Azure OpenAI resources is scoped
+    per-tenant. All connections use TLS in transit; database connections require an encrypted
+    (`sslmode=require`) session.</p>
+
+  <h2>7. Your Rights</h2>
+  <p>Depending on your jurisdiction, you may have rights to access, correct, export, or delete your
+    organization's data. Requests should be directed to your organization's administrator, who can
+    escalate to us via the contact details below.</p>
+
+  <h2>8. Children's Privacy</h2>
+  <p>The Service is a business-to-business product intended for use by working professionals within a
+    licensed organization and is not directed at, or knowingly used to collect information from,
+    children.</p>
+
+  <h2>9. Changes to This Policy</h2>
+  <p>We may update this Privacy Policy from time to time. Material changes will be reflected by
+    updating the "Last updated" date above.</p>
+
+  <h2>10. Contact Us</h2>
+  <p>Questions about this Privacy Policy can be sent to
+    <a href="mailto:privacy@rapidviableproduct.com">privacy@rapidviableproduct.com</a>.</p>
+</div>
+{% endblock %}

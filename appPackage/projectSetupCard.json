@@ -1,0 +1,61 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "Project created",
+      "weight": "Bolder",
+      "size": "Medium",
+      "wrap": true
+    },
+    {
+      "type": "TextBlock",
+      "text": "${name}",
+      "weight": "Bolder",
+      "size": "Large",
+      "spacing": "Small",
+      "wrap": true
+    },
+    {
+      "type": "TextBlock",
+      "text": "Status: ${status}",
+      "isSubtle": true,
+      "spacing": "Small",
+      "wrap": true
+    },
+    {
+      "type": "FactSet",
+      "spacing": "Medium",
+      "facts": [
+        {
+          "title": "SharePoint Site ID",
+          "value": "${if(sharepoint_site_id, sharepoint_site_id, 'Not linked yet')}"
+        },
+        {
+          "title": "Digital Employee",
+          "value": "${if(digital_employee_name, digital_employee_name, 'Not configured yet')}"
+        },
+        {
+          "title": "Digital Employee Email",
+          "value": "${if(digital_employee_email, digital_employee_email, 'Not configured yet')}"
+        },
+        {
+          "title": "Created",
+          "value": "${formatDateTime(created_at, 'compact')}"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.Execute",
+      "title": "View Governance Brief",
+      "verb": "getProjectBrief",
+      "data": {
+        "project_id": "${id}"
+      }
+    }
+  ]
+}

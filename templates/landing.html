@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}{% if success %}You're all set -- GIABO Digital PMO{% else %}Setup failed -- GIABO Digital PMO{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="card card-glow center-card">
+    {% if success %}
+      <div class="alert-icon success">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>
+      <h1 style="font-size:1.6rem;">You're all set!</h1>
+      <p>
+        Organization <strong style="color:var(--text-primary);">{{ organization_name }}</strong> is now
+        provisioned on the
+        <span class="badge {% if plan_tier == 'free_trial' %}badge-cyan{% else %}badge-active{% endif %}">{{ plan_tier }}</span>
+        plan.
+      </p>
+      <p>You can start using the GIABO Digital PMO from Microsoft Teams right away, or configure your
+        first project from the admin dashboard below.</p>
+      <div class="btn-row" style="justify-content:center;margin-top:8px;">
+        <a class="btn btn-primary" href="/dashboard/{{ tenant_id }}">Open Admin Dashboard</a>
+        <a class="btn btn-ghost" href="/">Back to Home</a>
+      </div>
+    {% else %}
+      <div class="alert-icon error">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+      </div>
+      <h1 style="font-size:1.6rem;">We couldn't finish setting up your subscription</h1>
+      <p>Microsoft's Marketplace service didn't confirm this purchase. Please try again from the
+        Azure Marketplace, or contact support if this keeps happening.</p>
+      <span class="badge badge-danger">Setup error</span>
+      {% if error_message %}
+        <div class="error-detail">{{ error_message }}</div>
+      {% endif %}
+      <div class="btn-row" style="justify-content:center;margin-top:24px;">
+        <a class="btn btn-ghost" href="/">Back to Home</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
