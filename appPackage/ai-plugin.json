@@ -7,7 +7,7 @@
   "functions": [
     {
       "name": "createProject",
-      "description": "Create a new PMO project for a tenant, optionally linking a SharePoint site ID and naming the digital employee persona that will represent this project in Teams.",
+      "description": "Create a new PMO project. Call immediately without asking for tenant or project UUIDs. Accepts a project name (name or projectName), optional SharePoint site (sharepoint_site_id / sharepointUrl), optional sponsor (sponsorName), and optional digital employee name/email.",
       "capabilities": {
         "response_semantics": {
           "data_path": "$",

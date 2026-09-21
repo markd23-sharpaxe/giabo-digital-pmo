@@ -33,7 +33,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -97,13 +97,40 @@ def _resolve_default_project(session: Session) -> Project:
 
 
 class ProjectCreateRequest(BaseModel):
+    """Accepts both our snake_case OpenAPI names and the camelCase
+    variants Copilot's function-calling runtime commonly emits (e.g.
+    `projectName`, `sponsorName`, `sharepointUrl`). Serialization stays
+    snake_case so `projectSetupCard.json` data-binding keeps working.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
     tenant_id: Optional[UUID] = Field(
-        default=None, description="Omit to default to the most recently active tenant."
+        default=None,
+        description="Omit to default to the most recently active tenant.",
+        validation_alias=AliasChoices("tenant_id", "tenantId"),
     )
-    name: str
-    sharepoint_site_id: Optional[str] = None
-    digital_employee_name: Optional[str] = None
-    digital_employee_email: Optional[str] = None
+    name: str = Field(validation_alias=AliasChoices("name", "projectName"))
+    sharepoint_site_id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("sharepoint_site_id", "sharepointSiteId"),
+    )
+    sharepoint_site_url: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("sharepoint_site_url", "sharepointSiteUrl", "sharepointUrl"),
+    )
+    sponsor_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("sponsor_name", "sponsorName"),
+    )
+    digital_employee_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("digital_employee_name", "digitalEmployeeName"),
+    )
+    digital_employee_email: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("digital_employee_email", "digitalEmployeeEmail"),
+    )
 
 
 class ProjectCreateResponse(BaseModel):
@@ -141,6 +168,8 @@ async def create_project(payload: ProjectCreateRequest) -> ProjectCreateResponse
             tenant_id=tenant.id,
             name=name,
             sharepoint_site_id=(payload.sharepoint_site_id or None),
+            sharepoint_site_url=(payload.sharepoint_site_url or None),
+            sponsor_name=(payload.sponsor_name or None),
             digital_employee_name=(payload.digital_employee_name or None),
             digital_employee_email=(payload.digital_employee_email or None),
             status=ProjectStatus.NEW,
@@ -204,6 +233,7 @@ async def get_project_brief(
     project_id: Optional[UUID] = Query(
         default=None, description="Omit to default to the most recently active project."
     ),
+    projectId: Optional[UUID] = Query(default=None, include_in_schema=False),
 ) -> ProjectBriefResponse:
     """Structured markdown governance brief: open risks, open actions, and
     the most recent swarm agent-execution audit log entries for this
@@ -215,11 +245,12 @@ async def get_project_brief(
     for every path parameter, which would make an "omit to auto-resolve"
     contract impossible to express if this stayed `/projects/{project_id}/brief`.
     """
+    resolved_id = project_id or projectId
     with get_session() as session:
-        if project_id is not None:
-            project = session.get(Project, project_id)
+        if resolved_id is not None:
+            project = session.get(Project, resolved_id)
             if project is None:
-                raise HTTPException(status_code=404, detail=f"project {project_id} not found")
+                raise HTTPException(status_code=404, detail=f"project {resolved_id} not found")
         else:
             project = _resolve_default_project(session)
 
@@ -297,17 +328,19 @@ async def get_usage_telemetry(
     tenant_id: Optional[UUID] = Query(
         default=None, description="Omit to default to the most recently active tenant."
     ),
+    tenantId: Optional[UUID] = Query(default=None, include_in_schema=False),
 ) -> UsageTelemetryResponse:
     """Plan tier, swarm health, active project count, and metered
     token/overage tracking -- the same figures the (now-removed) dashboard
     showed, backing `core.billing`'s Phase 2 gates. If `tenant_id` is
     omitted, defaults to the most recently active tenant.
     """
+    resolved_tenant_id = tenant_id or tenantId
     with get_session() as session:
-        if tenant_id is not None:
-            tenant = session.get(Tenant, tenant_id)
+        if resolved_tenant_id is not None:
+            tenant = session.get(Tenant, resolved_tenant_id)
             if tenant is None:
-                raise HTTPException(status_code=404, detail=f"tenant_id {tenant_id} not found")
+                raise HTTPException(status_code=404, detail=f"tenant_id {resolved_tenant_id} not found")
         else:
             tenant = _resolve_default_tenant(session)
 

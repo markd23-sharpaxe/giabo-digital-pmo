@@ -100,15 +100,48 @@ components:
           format: uuid
           nullable: true
           description: Omit to default to the most recently active tenant.
-        name:
-          type: string
+        name: str
         sharepoint_site_id:
           type: string
           nullable: true
+        sharepoint_site_url:
+          type: string
+          nullable: true
+          description: Alias also accepted as sharepointUrl / sharepointSiteUrl.
+        sponsor_name:
+          type: string
+          nullable: true
+          description: Alias also accepted as sponsorName.
         digital_employee_name:
           type: string
           nullable: true
         digital_employee_email:
+          type: string
+          nullable: true
+        projectName:
+          type: string
+          description: Copilot camelCase alias for name.
+        sharepointUrl:
+          type: string
+          nullable: true
+          description: Copilot camelCase alias for sharepoint_site_url.
+        sharepointSiteUrl:
+          type: string
+          nullable: true
+        sharepointSiteId:
+          type: string
+          nullable: true
+        sponsorName:
+          type: string
+          nullable: true
+        tenantId:
+          type: string
+          format: uuid
+          nullable: true
+        digitalEmployeeName:
+          type: string
+          nullable: true
+        digitalEmployeeEmail:
           type: string
           nullable: true
     ProjectCreateResponse:

@@ -69,6 +69,7 @@ from botbuilder.core import ConversationState, MemoryStorage, TurnContext
 from botbuilder.integration.aiohttp import CloudAdapter, ConfigurationBotFrameworkAuthentication
 from botbuilder.schema import Activity, ActivityTypes
 from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -265,6 +266,18 @@ CONVERSATION_STATE = ConversationState(MemoryStorage())
 BOT = PMOBot(CONVERSATION_STATE, _workflow, _checkpoint_storage)
 
 app = FastAPI(title="GIABO Digital PMO -- Teams Bot")
+
+# M365 Copilot / Teams sideloading fetches plugin metadata and then calls
+# the API bridge from Microsoft's cloud runners. Without CORS, browser-based
+# Copilot surfaces and the plugin runtime's preflight OPTIONS requests get
+# blocked before they reach api/copilot.py.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Declarative Agent Architecture Pivot: the standalone Jinja2 marketing
 # homepage/tenant-admin-dashboard (formerly `api/web.py`) is gone -- PMO
