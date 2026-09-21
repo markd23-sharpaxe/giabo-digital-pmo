@@ -70,7 +70,7 @@ from botbuilder.integration.aiohttp import CloudAdapter, ConfigurationBotFramewo
 from botbuilder.schema import Activity, ActivityTypes
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.bot import PMOBot
@@ -307,6 +307,17 @@ app.include_router(legal_router)
 # /api/marketplace/webhook (its configured Webhook URL). See
 # `api/marketplace.py` for the full onboarding + resync flow.
 app.include_router(marketplace_router)
+
+# M365 Copilot's plugin loader fetches this from the app's root domain to
+# discover createProject / getProjectBrief / getUsageTelemetry. Resolved
+# against the repo root (same trick as `_STATIC_DIR`) so `uvicorn api.main:app`
+# still finds the file when the process cwd isn't the repo root.
+_OPENAPI_YAML = Path(__file__).resolve().parent.parent / "appPackage" / "openapi.yaml"
+
+
+@app.get("/openapi.yaml")
+async def serve_openapi_yaml():
+    return FileResponse(_OPENAPI_YAML, media_type="text/yaml")
 
 
 @app.post("/api/messages")
