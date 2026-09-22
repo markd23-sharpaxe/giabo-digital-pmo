@@ -2,7 +2,7 @@
 Architecture Pivot).
 
 FastAPI routes called directly by the `ai-plugin.json` API-plugin manifest's
-`OpenApi` runtime, per `appPackage/openapi.yaml` -- this is the entire
+`OpenApi` runtime, per `appPackage/openapi.json` -- this is the entire
 interactive surface for creating and inspecting projects now that the
 standalone Jinja2 marketing homepage/tenant dashboard (formerly `api/web.py`)
 is gone. `POST /api/projects/create`'s response is what

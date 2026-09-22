@@ -265,7 +265,7 @@ CONVERSATION_STATE = ConversationState(MemoryStorage())
 
 BOT = PMOBot(CONVERSATION_STATE, _workflow, _checkpoint_storage)
 
-app = FastAPI(title="GIABO Digital PMO -- Teams Bot")
+app = FastAPI(title="GIABO Digital PMO -- Teams Bot", openapi_url="/internal/openapi.json")
 
 # M365 Copilot / Teams sideloading fetches plugin metadata and then calls
 # the API bridge from Microsoft's cloud runners. Without CORS, browser-based
@@ -295,7 +295,7 @@ app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 # Microsoft 365 Copilot Declarative Agent API Bridge: POST
 # /api/projects/create, GET /api/projects/{projectId}/brief, GET
 # /api/usage/telemetry -- called directly by the `ai-plugin.json` OpenAPI
-# runtime described in `appPackage/openapi.yaml`. See `api/copilot.py`.
+# runtime described in `appPackage/openapi.json`. See `api/copilot.py`.
 app.include_router(copilot_router)
 
 # /privacy, /terms -- the two dashboard-era routes that survive the pivot
@@ -309,15 +309,17 @@ app.include_router(legal_router)
 app.include_router(marketplace_router)
 
 # M365 Copilot's plugin loader fetches this from the app's root domain to
-# discover createProject / getProjectBrief / getUsageTelemetry.
-_OPENAPI_YAML_RELATIVE = os.path.join("appPackage", "openapi.yaml")
-_OPENAPI_YAML_ABSOLUTE = Path(__file__).resolve().parent.parent / "appPackage" / "openapi.yaml"
+# discover createProject / getProjectBrief / getUsageTelemetry. FastAPI's
+# auto-generated schema is moved off `/openapi.json` so Copilot gets our
+# static plugin spec rather than the full internal API surface.
+_OPENAPI_JSON_RELATIVE = os.path.join("appPackage", "openapi.json")
+_OPENAPI_JSON_ABSOLUTE = Path(__file__).resolve().parent.parent / "appPackage" / "openapi.json"
 
 
-@app.get("/openapi.yaml")
-async def serve_openapi_yaml():
-    path = _OPENAPI_YAML_RELATIVE if os.path.isfile(_OPENAPI_YAML_RELATIVE) else str(_OPENAPI_YAML_ABSOLUTE)
-    return FileResponse(path, media_type="text/yaml")
+@app.get("/openapi.json")
+async def serve_openapi_json():
+    path = _OPENAPI_JSON_RELATIVE if os.path.isfile(_OPENAPI_JSON_RELATIVE) else str(_OPENAPI_JSON_ABSOLUTE)
+    return FileResponse(path, media_type="application/json")
 
 
 @app.post("/api/messages")

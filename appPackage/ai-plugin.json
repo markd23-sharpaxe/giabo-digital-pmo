@@ -54,7 +54,7 @@
         "type": "None"
       },
       "spec": {
-        "url": "openapi.yaml"
+        "url": "openapi.json"
       },
       "run_for_functions": [
         "createProject",
