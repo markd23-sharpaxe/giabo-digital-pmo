@@ -309,15 +309,15 @@ app.include_router(legal_router)
 app.include_router(marketplace_router)
 
 # M365 Copilot's plugin loader fetches this from the app's root domain to
-# discover createProject / getProjectBrief / getUsageTelemetry. Resolved
-# against the repo root (same trick as `_STATIC_DIR`) so `uvicorn api.main:app`
-# still finds the file when the process cwd isn't the repo root.
-_OPENAPI_YAML = Path(__file__).resolve().parent.parent / "appPackage" / "openapi.yaml"
+# discover createProject / getProjectBrief / getUsageTelemetry.
+_OPENAPI_YAML_RELATIVE = os.path.join("appPackage", "openapi.yaml")
+_OPENAPI_YAML_ABSOLUTE = Path(__file__).resolve().parent.parent / "appPackage" / "openapi.yaml"
 
 
 @app.get("/openapi.yaml")
 async def serve_openapi_yaml():
-    return FileResponse(_OPENAPI_YAML, media_type="text/yaml")
+    path = _OPENAPI_YAML_RELATIVE if os.path.isfile(_OPENAPI_YAML_RELATIVE) else str(_OPENAPI_YAML_ABSOLUTE)
+    return FileResponse(path, media_type="text/yaml")
 
 
 @app.post("/api/messages")
