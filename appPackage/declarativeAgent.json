@@ -21,7 +21,7 @@
   "actions": [
     {
       "id": "giaboPmoPlugin",
-      "file": "openapi.json"
+      "file": "ai-plugin.json"
     }
   ]
 }
