@@ -338,8 +338,17 @@ def test_dashboard_routes_removed_legal_routes_survive(client: TestClient) -> No
 
     privacy_resp = client.get("/privacy")
     terms_resp = client.get("/terms")
+    guide_resp = client.get("/guide")
     _check("GET /privacy still returns 200 (Partner Center + manifest.json require this)", privacy_resp.status_code == 200)
     _check("GET /terms still returns 200 (Partner Center + manifest.json require this)", terms_resp.status_code == 200)
+    _check("GET /guide returns 200 (Agent Handbook)", guide_resp.status_code == 200)
+    if guide_resp.status_code == 200:
+        body = guide_resp.text
+        _check("guide contains Welcome heading", "Welcome &amp; Overview" in body or "Welcome & Overview" in body)
+        _check("guide contains Swarm Capabilities heading", "Swarm Capabilities" in body)
+        _check("guide contains Conversational Syntax heading", "Conversational Syntax" in body)
+        _check("guide contains Project Tuning heading", "Project Tuning" in body)
+        _check("guide nav links to Agent Handbook", "Agent Handbook" in body)
 
     landing_resp = client.get("/marketplace/landing", params={"token": "not-a-real-token"})
     _check(
