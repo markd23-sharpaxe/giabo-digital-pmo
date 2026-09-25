@@ -3,6 +3,17 @@
 {% block title %}{% if success %}You're all set -- GIABO Digital PMO{% else %}Setup failed -- GIABO Digital PMO{% endif %}{% endblock %}
 
 {% block content %}
+{% if plan_tier == 'free_trial' %}
+  {% set plan_label = 'Free 14-Day Trial' %}
+{% elif plan_tier == 'paid_monthly' %}
+  {% set plan_label = 'Pro Plan' %}
+{% elif plan_tier == 'trial_exhausted' %}
+  {% set plan_label = 'Trial Ended / Upgrade Required' %}
+{% elif plan_tier == 'paid_halt' %}
+  {% set plan_label = 'Subscription Paused' %}
+{% else %}
+  {% set plan_label = plan_tier %}
+{% endif %}
 <div class="container">
   <div class="card card-glow center-card">
     {% if success %}
@@ -11,16 +22,15 @@
       </div>
       <h1 style="font-size:1.6rem;">You're all set!</h1>
       <p>
-        Organization <strong style="color:var(--text-primary);">{{ organization_name }}</strong> is now
-        provisioned on the
-        <span class="badge {% if plan_tier == 'free_trial' %}badge-cyan{% else %}badge-active{% endif %}">{{ plan_tier }}</span>
-        plan.
+        <strong style="color:var(--text-primary);">{{ organization_name }}</strong> is now
+        live on the
+        <span class="badge {% if plan_tier == 'free_trial' %}badge-cyan{% else %}badge-active{% endif %}">{{ plan_label }}</span>.
       </p>
-      <p>You can start using the GIABO Digital PMO from Microsoft Teams right away, or configure your
-        first project from the admin dashboard below.</p>
+      <p>Open Microsoft Teams or Microsoft 365 Copilot to start using the GIABO Digital PMO.
+        The Agent Handbook below walks through what to say and how the office works.</p>
       <div class="btn-row" style="justify-content:center;margin-top:8px;">
-        <a class="btn btn-primary" href="/dashboard/{{ tenant_id }}">Open Admin Dashboard</a>
-        <a class="btn btn-ghost" href="/">Back to Home</a>
+        <a class="btn btn-primary" href="/guide">Open the Agent Handbook</a>
+        <a class="btn btn-ghost" href="/privacy">Privacy Policy</a>
       </div>
     {% else %}
       <div class="alert-icon error">
@@ -34,7 +44,7 @@
         <div class="error-detail">{{ error_message }}</div>
       {% endif %}
       <div class="btn-row" style="justify-content:center;margin-top:24px;">
-        <a class="btn btn-ghost" href="/">Back to Home</a>
+        <a class="btn btn-ghost" href="/guide">Agent Handbook</a>
       </div>
     {% endif %}
   </div>

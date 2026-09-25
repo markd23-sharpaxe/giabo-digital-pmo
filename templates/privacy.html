@@ -18,15 +18,16 @@
   <h2>1. Information We Collect</h2>
   <p>We collect the minimum information necessary to operate the Service:</p>
   <ul>
-    <li><strong>Subscription &amp; tenant data</strong> -- the Azure subscription ID, Azure AD (Entra ID)
-      customer tenant ID, organization name, and selected plan tier, provided by Microsoft's Partner
-      Center SaaS Fulfillment API when you activate the Service on the Azure Marketplace.</li>
-    <li><strong>Project data</strong> -- project names, baselines, SharePoint site identifiers, and the
+    <li><strong>Subscription &amp; organization data</strong> -- the Azure subscription identifier,
+      Microsoft Entra organization identifier, organization name, and selected plan (Free 14-Day
+      Trial or Pro Plan), provided by Microsoft when you activate the Service on the Azure
+      Marketplace.</li>
+    <li><strong>Project data</strong> -- project names, locked plans, SharePoint site identifiers, and the
       document content the Service is granted access to via Microsoft Graph, strictly limited to the
       permissions your administrator consents to.</li>
     <li><strong>Conversation content</strong> -- messages sent to the digital employee in Microsoft
       Teams, processed to extract task progress, risks, blockers, and change requests.</li>
-    <li><strong>Usage &amp; billing telemetry</strong> -- token consumption per agent invocation, used
+    <li><strong>Usage &amp; billing telemetry</strong> -- usage of the digital employee per request, used
       solely to enforce your plan's usage allowance and for Azure Marketplace metering.</li>
   </ul>
 
@@ -52,20 +53,20 @@
   </ul>
 
   <h2>4. Data Storage &amp; Location</h2>
-  <p>Tenant, project, and audit-trail data is stored in an Azure Database for PostgreSQL instance
-    operated by Rapid Viable Product. Data residency follows the Azure region in which that instance
-    is deployed; contact us if your organization has a specific residency requirement.</p>
+  <p>Organization, project, and audit-trail data is stored in an Azure Database for PostgreSQL
+    instance operated by Rapid Viable Product. Data residency follows the Azure region in which
+    that instance is deployed; contact us if your organization has a specific residency requirement.</p>
 
   <h2>5. Data Retention</h2>
   <p>We retain subscription and project data for as long as your subscription is active, plus a
     reasonable period afterward to satisfy accounting, audit, and legal obligations. You may request
-    deletion of your tenant's data by contacting us; some records (e.g. billing/metering history) may
-    be retained where required by law.</p>
+    deletion of your organization's data by contacting us; some records (for example billing history)
+    may be retained where required by law.</p>
 
   <h2>6. Security</h2>
   <p>Access to the Service's Microsoft Graph permissions and Azure OpenAI resources is scoped
-    per-tenant. All connections use TLS in transit; database connections require an encrypted
-    (`sslmode=require`) session.</p>
+    to your organization. All connections use TLS in transit; stored data is accessed over an
+    encrypted session.</p>
 
   <h2>7. Your Rights</h2>
   <p>Depending on your jurisdiction, you may have rights to access, correct, export, or delete your

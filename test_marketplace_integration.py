@@ -217,7 +217,7 @@ def test_landing_new_free_trial_purchase(client: TestClient) -> None:
 
     _check("landing returns 200", resp.status_code == 200, resp.text[:300])
     _check("landing page mentions the organization name", "Test Org" in resp.text)
-    _check("landing page mentions the free_trial plan", "free_trial" in resp.text)
+    _check("landing page mentions the Free 14-Day Trial plan", "Free 14-Day Trial" in resp.text)
     mock_resolve.assert_awaited_once_with("purchase-token-abc")
     _check("get_subscription called twice (initial + post-activation re-fetch)", mock_get.await_count == 2)
     mock_activate.assert_awaited_once()

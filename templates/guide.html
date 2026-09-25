@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Agent Handbook -- GIABO Digital PMO{% endblock %}
-{% block meta_description %}Digital User Guide for the GIABO 27-role PMO swarm: Copilot commands, Teams phrases, and governance rules that cannot be tuned away.{% endblock %}
+{% block meta_description %}How to work with the GIABO Digital PMO in Microsoft 365 Copilot and Teams: capabilities, example phrases, and the governance rules that stay fixed.{% endblock %}
 
 {% block content %}
 <div class="container handbook">
@@ -9,296 +9,299 @@
   <h1>Agent Handbook</h1>
   <p class="updated">Last updated: September 25, 2026</p>
   <p class="lead">
-    This handbook tells a project team how the GIABO Digital PMO actually works today:
-    what the 27-role swarm can do, what you can type into Microsoft 365 Copilot or Teams,
-    and which governance rules no one — including the agents — is allowed to change.
+    Welcome to your digital project office. This handbook explains what the GIABO Digital PMO
+    can do for your team, how to talk to it in Microsoft 365 Copilot and Teams, and which
+    governance rules stay in place so a locked plan is never changed in silence.
   </p>
   <nav class="toc" aria-label="Handbook sections">
     <a href="#welcome">Welcome</a>
     <a href="#capabilities">Swarm capabilities</a>
-    <a href="#syntax">Conversational syntax</a>
-    <a href="#tuning">Project tuning</a>
+    <a href="#syntax">How to ask</a>
+    <a href="#tuning">What you can tune</a>
   </nav>
 
   <h2 id="welcome">1. Welcome &amp; Overview</h2>
   <p>
-    GIABO is an autonomous digital employee for project administration. It is not one chatbot
-    with a long prompt. It is a <strong style="color:var(--text-primary);">27-role swarm</strong>
-    that routes work to a specialist, writes structured facts into Azure PostgreSQL, and stops
-    for a human when a locked baseline or a PRINCE2 stage tolerance is at stake.
+    GIABO is an autonomous digital employee for project administration. It is a
+    <strong style="color:var(--text-primary);">team of 27 specialists</strong>, not a single
+    chatbot. Each request is handed to the right specialist, the result is saved to your
+    project record, and a person is asked to decide whenever a locked plan or a stage
+    tolerance is at stake.
   </p>
-  <p>You meet the swarm on two surfaces. They share the same database; they are not the same conversation.</p>
+  <p>You meet GIABO in two places. They share the same project record; they are not the same conversation.</p>
   <div class="agent-grid">
     <article class="card card-hover">
       <h3>Microsoft 365 Copilot</h3>
       <p>
-        The declarative agent sets up projects, returns a governance brief, and reports plan usage.
-        It never asks you for a raw tenant or project UUID. Use the conversation starters
-        <em>Set up a new project</em>, <em>Give me the project brief</em>, and
+        Use Copilot to stand up a project, request a governance brief, or check plan usage.
+        You will never be asked for an internal identifier. Start with
+        <em>Set up a new project</em>, <em>Give me the project brief</em>, or
         <em>Check my usage and billing tier</em>.
       </p>
     </article>
     <article class="card card-hover">
       <h3>Microsoft Teams</h3>
       <p>
-        Chat with the digital employee to log schedule progress, raise blockers, flag risks,
-        or request a locked-baseline change. The router sends each message to one specialist.
-        A baseline proposal pauses as an Adaptive Card for the human Project Manager (PM Veto).
+        Chat with the digital employee to log progress, raise a blocker, flag a risk, or
+        request a change to the locked plan. A proposed plan change pauses as an approval
+        card for the Project Manager.
       </p>
     </article>
   </div>
   <p>
-    The swarm’s job is administration: keep RAID current, keep the schedule honest, chase work
-    that is actually overdue, and refuse silent baseline writes. It does not replace the Project
-    Manager. It will not authorize its own change.
+    The office keeps your RAID log current (risks, assumptions, issues, and dependencies),
+    keeps the schedule honest, follows up on work that is actually overdue, and refuses
+    silent plan changes. It does not replace the Project Manager. It will not approve its
+    own change.
   </p>
 
   <h2 id="capabilities">2. The Swarm Capabilities</h2>
-  <p>Four capabilities you will feel in day-to-day chat. Everything else in the roster supports them.</p>
+  <p>Four capabilities you will notice in day-to-day work. The rest of the team supports them behind the scenes.</p>
   <div class="agent-grid">
     <article class="card agent-card card-hover">
       <div class="agent-icon" aria-hidden="true">P</div>
-      <h3>PMP schedule tracking</h3>
+      <h3>Schedule tracking</h3>
       <p>
-        Say hours spent and percent complete. The PMP specialist records
-        <code>TaskProgressPayload</code> only. It does not draft a new end date or budget.
+        Tell GIABO how many hours you spent and how complete the task is. The schedule
+        specialist records progress only. It will not invent a new end date or budget.
       </p>
     </article>
     <article class="card agent-card card-hover">
       <div class="agent-icon" aria-hidden="true">A</div>
-      <h3>Agile blocker clearing</h3>
+      <h3>Blocker clearing</h3>
       <p>
-        Impediments and cross-team waits go to the Agile facilitator. You get a blocker record
-        and a next action item — not a percent-complete write and not a baseline slip.
+        Impediments and cross-team waits go to the Agile facilitator. You get a recorded
+        blocker and a next step — not a progress rewrite, and not a plan change.
       </p>
     </article>
     <article class="card agent-card card-hover">
       <div class="agent-icon" aria-hidden="true">R</div>
-      <h3>PRINCE2 risk &amp; exception</h3>
+      <h3>Risk and exception</h3>
       <p>
-        Budget, scope, timeline, and compliance language is scored against stage tolerance.
-        A true breach raises an exception card. In-tolerance risk is logged, not invented.
+        Budget, scope, timeline, and compliance concerns are scored against the stage
+        tolerance you already agreed. A real breach raises an exception card. A risk that
+        is still inside tolerance is logged, not escalated for drama.
       </p>
     </article>
     <article class="card agent-card card-hover">
       <div class="agent-icon" aria-hidden="true">C</div>
-      <h3>Dynamic chasing</h3>
+      <h3>Considerate chasing</h3>
       <p>
-        Outreach is priority-scored, not a daily blast. If someone was contacted in the last
-        24 hours, the chase is suppressed — even on a critical-path slip.
+        Follow-ups are prioritized, not blasted. If someone was contacted in the last
+        24 hours, GIABO stays quiet — even when the work sits on the critical path.
       </p>
     </article>
   </div>
 
-  <h3>27-role roster</h3>
-  <p>Grouped the way the swarm is built. Conversational specialists are who you talk to; the rest run in the background or as gates.</p>
+  <h3>The 27-role team</h3>
+  <p>Specialists you talk to first; everyone else works in the background or as a safety check.</p>
 
   <div class="roster-group">
-    <h3>Conversational specialists</h3>
+    <h3>Specialists you talk to</h3>
     <table>
       <thead>
-        <tr><th>Role</th><th>What it does</th></tr>
+        <tr><th>Role</th><th>How they help</th></tr>
       </thead>
       <tbody>
-        <tr><td>Conversational router</td><td>Sends each Teams message to PMP, Agile, Governance, Change Control, or escalation.</td></tr>
-        <tr><td>PMP schedule specialist</td><td>Logs task progress (hours, percent complete, critical path).</td></tr>
-        <tr><td>Agile facilitator</td><td>Logs blockers and the next unblock step.</td></tr>
-        <tr><td>PRINCE2 governance worker</td><td>Classifies risk and whether a stage tolerance is breached. Does not pause the graph itself.</td></tr>
-        <tr><td>Change Control Clerk</td><td>The only role that may draft a locked-baseline change. Cannot authorize it.</td></tr>
-        <tr><td>Chasing agent</td><td>Drafts a Teams check-in when score &gt; 0; stays silent inside the 24h fatigue window.</td></tr>
+        <tr><td>Conversation guide</td><td>Sends each Teams message to schedule, Agile, governance, change control, or a person.</td></tr>
+        <tr><td>Schedule specialist</td><td>Records hours, percent complete, and whether the work is on the critical path.</td></tr>
+        <tr><td>Agile facilitator</td><td>Records blockers and the next step to unblock the team.</td></tr>
+        <tr><td>Governance specialist</td><td>Scores the risk and whether a stage tolerance is breached. Does not pause the conversation itself.</td></tr>
+        <tr><td>Change Control Clerk</td><td>The only role that may draft a change to the locked plan. Cannot approve it.</td></tr>
+        <tr><td>Chasing specialist</td><td>Sends a Teams check-in when follow-up is warranted; stays silent for 24 hours after last contact.</td></tr>
       </tbody>
     </table>
   </div>
 
   <div class="roster-group">
-    <h3>RAID write-back</h3>
+    <h3>RAID logkeepers</h3>
     <table>
       <thead>
-        <tr><th>Role</th><th>What it does</th></tr>
+        <tr><th>Role</th><th>How they help</th></tr>
       </thead>
       <tbody>
-        <tr><td>PRINCE2 exception master</td><td>Writes decision artifacts when a stage tolerance is breached.</td></tr>
-        <tr><td>RAID compliance auto-chaser</td><td>Idempotent writes for assumptions, issues, and actions.</td></tr>
-        <tr><td>Risk radar monitor</td><td>Standard-tier risks and dependencies. Denied on a free trial.</td></tr>
-        <tr><td>Lessons learned curator</td><td>Writes lessons only. Will not touch budget or baseline.</td></tr>
-        <tr><td>Dependency map maintainer</td><td>Writes dependencies only. Will not write <code>percent_complete</code>.</td></tr>
-        <tr><td>Scrum master liaison</td><td>Standard-tier sprint records. Denied on a free trial.</td></tr>
+        <tr><td>Exception master</td><td>Records a formal decision when a stage tolerance is breached.</td></tr>
+        <tr><td>RAID compliance chaser</td><td>Keeps assumptions, issues, and actions up to date without creating duplicates.</td></tr>
+        <tr><td>Risk radar</td><td>Tracks risks and dependencies. Available on the Pro Plan; not included in the Free 14-Day Trial.</td></tr>
+        <tr><td>Lessons curator</td><td>Records lessons learned only. Will not touch budget or the locked plan.</td></tr>
+        <tr><td>Dependency map</td><td>Maintains dependencies only. Will not rewrite task progress.</td></tr>
+        <tr><td>Scrum liaison</td><td>Keeps sprint records. Available on the Pro Plan; not included in the Free 14-Day Trial.</td></tr>
       </tbody>
     </table>
   </div>
 
   <div class="roster-group">
-    <h3>Read-only analysts</h3>
+    <h3>Analysts (read only)</h3>
     <table>
       <thead>
-        <tr><th>Role</th><th>What it does</th></tr>
+        <tr><th>Role</th><th>How they help</th></tr>
       </thead>
       <tbody>
-        <tr><td>Forensic alignment engine</td><td>Golden Thread check: Aims → Goals → Objectives.</td></tr>
-        <tr><td>Earned value analyst</td><td>SPI / CPI readout. No task or baseline writes.</td></tr>
-        <tr><td>Governance synthesizer</td><td>Composes a RAID brief. Does not insert RAID rows.</td></tr>
-        <tr><td>Stage gate guardian</td><td>Escalates a tolerance breach. Does not rewrite budget.</td></tr>
-        <tr><td>Project health reporter</td><td>Status narrative only.</td></tr>
+        <tr><td>Alignment engine</td><td>Checks that aims, goals, and objectives still connect (the Golden Thread).</td></tr>
+        <tr><td>Earned value analyst</td><td>Reports schedule and cost performance. Does not change tasks or the locked plan.</td></tr>
+        <tr><td>Governance synthesizer</td><td>Writes a RAID summary. Does not add new RAID entries.</td></tr>
+        <tr><td>Stage-gate guardian</td><td>Escalates a tolerance breach. Does not rewrite the budget.</td></tr>
+        <tr><td>Health reporter</td><td>Produces a status narrative only.</td></tr>
       </tbody>
     </table>
   </div>
 
   <div class="roster-group">
-    <h3>Cron, ingress, and command</h3>
+    <h3>Scheduled reviews and document intake</h3>
     <table>
       <thead>
-        <tr><th>Role</th><th>What it does</th></tr>
+        <tr><th>Role</th><th>How they help</th></tr>
       </thead>
       <tbody>
-        <tr><td>PMO commander router</td><td>SharePoint-delta dispatcher. Never sees cron agents on its roster.</td></tr>
-        <tr><td>Governance auditor</td><td>Scheduled governance sweep. Not a Teams persona.</td></tr>
-        <tr><td>EOM financial checkpoint</td><td>Month-end financial artifact. Cron only.</td></tr>
-        <tr><td>Sprint boundary watchdog</td><td>Overdue sprint boundary. Cron only.</td></tr>
-        <tr><td>SharePoint delta ingestion</td><td>Caches documents and meeting transcripts; emits <code>DOCUMENT_INGESTED</code>.</td></tr>
+        <tr><td>PMO commander</td><td>Reads SharePoint changes and assigns the right specialists. Scheduled reviewers are not part of that conversation.</td></tr>
+        <tr><td>Governance auditor</td><td>Runs a scheduled governance review. Not a Teams chat persona.</td></tr>
+        <tr><td>Month-end checkpoint</td><td>Produces the end-of-month financial record on a schedule.</td></tr>
+        <tr><td>Sprint watchdog</td><td>Flags an overdue sprint boundary on a schedule.</td></tr>
+        <tr><td>SharePoint intake</td><td>Brings new documents and meeting notes into the project record automatically.</td></tr>
       </tbody>
     </table>
   </div>
 
   <div class="roster-group">
-    <h3>Guards (always on)</h3>
+    <h3>Safety checks (always on)</h3>
     <table>
       <thead>
-        <tr><th>Role</th><th>What it does</th></tr>
+        <tr><th>Role</th><th>How they help</th></tr>
       </thead>
       <tbody>
-        <tr><td>Billing gatekeeper</td><td>Hard-halts a used-up trial or a held paid workspace before any model call.</td></tr>
-        <tr><td>Friction breaker</td><td>Two vague turns in a row force escalation, even if the router wanted a specialist.</td></tr>
-        <tr><td>Token loop breaker</td><td>Three failed structured-output attempts stop the turn.</td></tr>
-        <tr><td>PM Veto interrupt</td><td>Pauses a drafted baseline change until a human approves or rejects.</td></tr>
-        <tr><td>PRINCE2 exception interrupt</td><td>Pauses a tolerance breach until a human acknowledges or escalates to the board.</td></tr>
+        <tr><td>Billing guardian</td><td>Pauses work when the trial has ended or a paid subscription is paused, before any further usage.</td></tr>
+        <tr><td>Clarity check</td><td>Two vague replies in a row escalate to a person, even if a specialist was about to answer.</td></tr>
+        <tr><td>Quality stop</td><td>Stops the turn after three failed attempts to produce a valid answer.</td></tr>
+        <tr><td>Project Manager approval</td><td>Holds a drafted plan change until a person approves or declines.</td></tr>
+        <tr><td>Exception hold</td><td>Holds a tolerance breach until a person acknowledges it or escalates to the board.</td></tr>
       </tbody>
     </table>
   </div>
 
   <h2 id="syntax">3. Conversational Syntax &amp; Commands</h2>
   <p>
-    You do not need slash-commands. Write a normal sentence that contains the facts.
-    The router keys off those facts. Never paste a tenant or project UUID unless you already have one
-    and mean to use it; Copilot is instructed not to ask for them.
+    You do not need slash commands. Write a normal sentence that includes the facts.
+    GIABO routes from those facts. You do not need an internal project number unless you
+    already have one and choose to use it.
   </p>
 
   <h3>Microsoft 365 Copilot</h3>
   <table>
     <thead>
-      <tr><th>You say</th><th>What runs</th><th>What you get</th></tr>
+      <tr><th>You say</th><th>What happens</th><th>What you receive</th></tr>
     </thead>
     <tbody>
       <tr>
         <td><kbd>Set up a new project</kbd> plus a short name (and optional SharePoint site or digital-employee name)</td>
-        <td><code>createProject</code></td>
+        <td>Creates the project</td>
         <td>A project card. Use <strong>View Governance Brief</strong> on the card to open that project.</td>
       </tr>
       <tr>
         <td><kbd>Give me the project brief</kbd></td>
-        <td><code>getProjectBrief</code></td>
-        <td>Markdown of open risks, open actions, and recent swarm audit lines.</td>
+        <td>Builds the brief</td>
+        <td>Open risks, open actions, and a short activity log.</td>
       </tr>
       <tr>
         <td><kbd>Check my usage and billing tier</kbd></td>
-        <td><code>getUsageTelemetry</code></td>
-        <td>Plan tier, swarm status, project count, and metered spend versus allowance.</td>
+        <td>Reads your plan</td>
+        <td>Whether you are on the Free 14-Day Trial or the Pro Plan, workspace health, project count, and usage versus allowance.</td>
       </tr>
     </tbody>
   </table>
   <p>
-    Copilot create needs a <strong style="color:var(--text-primary);">project name</strong>.
+    Creating a project needs a <strong style="color:var(--text-primary);">project name</strong>.
     If you only tap the starter, add a name in the next sentence (for example
     <kbd>Set up a new project called Harbour Cutover</kbd>).
-    If the workspace is not linked yet, Copilot will say so — it cannot invent a tenant.
+    If this workspace is not linked yet, Copilot will say so — it will not invent an organization for you.
   </p>
 
   <h3>Microsoft Teams chat</h3>
   <table>
     <thead>
-      <tr><th>You say (examples)</th><th>Who answers</th><th>What is written</th></tr>
+      <tr><th>You say (examples)</th><th>Who answers</th><th>What is recorded</th></tr>
     </thead>
     <tbody>
       <tr>
-        <td><kbd>Logged 6h today; TSK-002 is 40% complete.</kbd></td>
-        <td>PMP schedule specialist</td>
-        <td>Task progress only. No baseline edit.</td>
+        <td><kbd>Logged 6 hours today; the cutover task is 40% complete.</kbd></td>
+        <td>Schedule specialist</td>
+        <td>Task progress only. The locked plan is untouched.</td>
       </tr>
       <tr>
-        <td><kbd>TSK-002 is blocked waiting on Legal to sign the DPA.</kbd></td>
+        <td><kbd>The cutover task is blocked waiting on Legal to sign the DPA.</kbd></td>
         <td>Agile facilitator</td>
-        <td>Blocker + next action. Not a percent-complete update.</td>
+        <td>A blocker and a next action. Progress percent is not rewritten.</td>
       </tr>
       <tr>
         <td><kbd>Stage 2 forecast is 15% over the 10% cost tolerance.</kbd></td>
-        <td>PRINCE2 governance worker</td>
-        <td>Risk score. Exception card only if the tolerance is actually breached.</td>
+        <td>Governance specialist</td>
+        <td>A risk score. An exception card appears only if the tolerance is actually breached.</td>
       </tr>
       <tr>
-        <td><kbd>Please change the locked baseline end date to 2027-09-01.</kbd></td>
+        <td><kbd>Please change the locked plan end date to 1 September 2027.</kbd></td>
         <td>Change Control Clerk</td>
-        <td>A proposal. The PM must approve the Adaptive Card before anything is written.</td>
+        <td>A proposal. The Project Manager must approve the card before anything is written.</td>
       </tr>
       <tr>
         <td><kbd>not sure, whatever you think</kbd> (twice)</td>
-        <td>Friction breaker</td>
-        <td>Escalation. The router’s specialist guess is overridden.</td>
+        <td>Clarity check</td>
+        <td>The conversation is escalated to a person.</td>
       </tr>
     </tbody>
   </table>
 
-  <h3>Phrases that will not do what you hope</h3>
+  <h3>Requests that will not work the way you might expect</h3>
   <table>
     <thead>
-      <tr><th>Phrase</th><th>Why it fails closed</th></tr>
+      <tr><th>Request</th><th>What GIABO does instead</th></tr>
     </thead>
     <tbody>
       <tr>
         <td>Asking the Clerk to “check the risk of slipping the date”</td>
-        <td>The Clerk records field/date/budget delta only. Risk discovery is Governance, on a separate turn.</td>
+        <td>The Clerk records only what changes on the plan (date or budget). Risk questions go to governance, in a separate turn.</td>
       </tr>
       <tr>
-        <td>Asking PMP, Agile, or Risk to “just move the baseline”</td>
-        <td>Only the Clerk drafts a <code>PendingChangePayload</code>. Everyone else is read/write-scoped away from baselines.</td>
+        <td>Asking schedule, Agile, or risk specialists to “just move the plan”</td>
+        <td>Only the Clerk drafts a plan change. Everyone else is kept away from the locked baseline.</td>
       </tr>
       <tr>
-        <td>Approving your own baseline change in chat text</td>
-        <td>Authorization is the PM Veto card, not a typed “approved.”</td>
+        <td>Typing “approved” to authorize your own plan change</td>
+        <td>Approval is the Project Manager card, not a chat message.</td>
       </tr>
     </tbody>
   </table>
 
   <h2 id="tuning">4. Project Tuning &amp; Customization</h2>
   <p>
-    You can steer <em>what the swarm works on</em> by how you write. You cannot steer
-    <em>the constitutional rules</em> with a chat message. There is no settings page today
-    that saves chaser aggressiveness or a numeric stage-tolerance slider.
+    You steer <em>what</em> GIABO works on by how you write. You cannot change
+    <em>the office rules</em> with a chat message. There is no settings page today
+    that stores chaser aggressiveness or a numeric tolerance slider.
   </p>
 
   <h3>What you can do in conversation</h3>
   <table>
     <thead>
-      <tr><th>Intent</th><th>How to say it</th><th>What actually happens</th></tr>
+      <tr><th>Intent</th><th>How to say it</th><th>What happens</th></tr>
     </thead>
     <tbody>
       <tr>
         <td>Name the work</td>
         <td><kbd>Set up a new project called North Pier, SharePoint site …</kbd></td>
-        <td>Creates a project row. Optional digital-employee name/email is stored for Outlook/Teams persona.</td>
+        <td>Creates the project. Optional digital-employee name and email become the persona used in Teams and Outlook.</td>
       </tr>
       <tr>
-        <td>Point at a document</td>
+        <td>Share a document</td>
         <td>Put the file in the linked SharePoint library</td>
-        <td>Delta ingest caches it and emits <code>DOCUMENT_INGESTED</code>. No extra Copilot command.</td>
+        <td>GIABO picks it up automatically. No extra Copilot command is required.</td>
       </tr>
       <tr>
         <td>Correct a fact</td>
         <td>Send the updated hours, percent, or blocker in Teams</td>
-        <td>The specialist overwrites its latest payload for that type. History lives in the database, not in the prompt.</td>
+        <td>The specialist updates the latest record of that type. History stays in your project record.</td>
       </tr>
       <tr>
         <td>Ask not to be chased</td>
         <td>Reply to a chase (any reply counts as contact)</td>
-        <td>The 24-hour fatigue window starts again. You cannot set that window to 2 hours or 7 days in chat.</td>
+        <td>The 24-hour quiet window starts again. You cannot set that window to two hours or seven days in chat.</td>
       </tr>
     </tbody>
   </table>
@@ -306,43 +309,44 @@
   <h3>Fixed by policy (not tunable)</h3>
   <table>
     <thead>
-      <tr><th>Invariant</th><th>Why it stays fixed</th></tr>
+      <tr><th>Office rule</th><th>Why it stays fixed</th></tr>
     </thead>
     <tbody>
       <tr>
-        <td>24-hour chase fatigue</td>
-        <td>Score is forced to 0.0 if last contact was under 24 hours, including after a critical-path slip event.</td>
+        <td>24-hour quiet window on chases</td>
+        <td>No follow-up is sent if someone was contacted in the last day, even after a critical-path slip.</td>
       </tr>
       <tr>
-        <td>Clerk never evaluates risk</td>
-        <td>Aim 1. The Clerk’s impact line is field/date/budget delta only. Risk questions are illegal on a slip event.</td>
+        <td>The Clerk never evaluates risk</td>
+        <td>A plan-change draft describes the date or budget movement only. Risk discovery belongs to governance.</td>
       </tr>
       <tr>
-        <td>Proactive agents never draft baselines</td>
-        <td>Aim 2. A governance wake after <code>BASELINE_SLIP_REQUESTED</code> classifies RAID. It does not edit the pending change.</td>
+        <td>Background specialists never draft plan changes</td>
+        <td>When governance wakes after a proposed slip, it classifies RAID. It does not edit the pending change.</td>
       </tr>
       <tr>
-        <td>PM Veto is not bypassed</td>
-        <td>Aim 3. Sibling event-bus runs do not resume a paused veto. Reject does not auto-redraft.</td>
+        <td>Project Manager approval is not bypassed</td>
+        <td>Follow-up work never resumes a paused approval. Declining a change does not auto-rewrite it.</td>
       </tr>
       <tr>
         <td>Stage tolerance is classified, not bargained</td>
-        <td>Governance sets <code>prince2_exception_triggered</code> from the facts you gave. There is no “set my tolerance to 20%” setting in chat.</td>
+        <td>Governance uses the facts you gave. There is no “set my tolerance to 20%” setting in chat.</td>
       </tr>
       <tr>
-        <td>Free trial vs Standard-tier agents</td>
-        <td>Risk Radar and Scrum Master Liaison stay denied on <code>free_trial</code>. That is a plan gate, not a prompt.</td>
+        <td>Free 14-Day Trial vs Pro Plan specialists</td>
+        <td>Risk Radar and Scrum Liaison stay on the Pro Plan. That is a plan entitlement, not a prompt you can override.</td>
       </tr>
       <tr>
-        <td>Billing halt outranks everyone</td>
-        <td>A used-up trial or held paid workspace never reaches Azure OpenAI, including proactive wakes.</td>
+        <td>Billing pause outranks everyone</td>
+        <td>If the trial has ended or the subscription is paused, no specialist continues — including background follow-ups.</td>
       </tr>
     </tbody>
   </table>
   <p>
-    If you need a different fatigue window or a persisted tolerance table, that is a product change —
-    not something the digital employee can grant itself. Until then, be precise in the message
-    (task id, hours, percent, the locked field you want changed) and let the human PM use the card.
+    A different quiet window or a saved tolerance table would be a product change —
+    not something the digital employee can grant itself. Until then, be precise
+    (the task, the hours, the percent, the locked field you want changed) and let
+    the Project Manager use the approval card.
   </p>
 </div>
 {% endblock %}
