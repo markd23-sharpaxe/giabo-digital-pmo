@@ -15,6 +15,11 @@ from api.templates import templates
 router = APIRouter()
 
 
+@router.get("/", response_class=HTMLResponse)
+async def homepage(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "index.html", {})
+
+
 @router.get("/privacy", response_class=HTMLResponse)
 async def privacy(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "privacy.html", {})

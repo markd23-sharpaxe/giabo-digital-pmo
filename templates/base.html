@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Rapid Viable Product -- GIABO Digital PMO{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}GIABO Digital PMO Swarm by Rapid Viable Product -- six autonomous agents, one governed outcome.{% endblock %}">
-  <link rel="icon" href="data:,">
+  <link rel="icon" type="image/png" href="/static/images/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -22,31 +22,13 @@
   <div class="site-wrap">
     <nav class="site-nav">
       <div class="container">
-        <span class="brand">
-          <svg class="rvp-logo" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <defs>
-              <radialGradient id="rvpMetal" cx="35%" cy="30%" r="75%">
-                <stop offset="0%" stop-color="#eef2f7"/>
-                <stop offset="45%" stop-color="#94a3b8"/>
-                <stop offset="100%" stop-color="#1e293b"/>
-              </radialGradient>
-              <linearGradient id="rvpArrow" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#38bdf8"/>
-                <stop offset="100%" stop-color="#00f2fe"/>
-              </linearGradient>
-            </defs>
-            <circle cx="24" cy="24" r="21" fill="url(#rvpMetal)"/>
-            <circle cx="24" cy="24" r="21" fill="none" stroke="#00f2fe" stroke-width="1.4" opacity="0.9"/>
-            <circle cx="24" cy="24" r="17" fill="#070b14"/>
-            <path d="M24 32 V16 M24 16 L17.5 22.5 M24 16 L30.5 22.5"
-                  stroke="url(#rvpArrow)" stroke-width="3.1" stroke-linecap="round"
-                  stroke-linejoin="round" fill="none"/>
-          </svg>
+        <a class="brand" href="/">
+          <img src="/static/images/logo.png" alt="RVP Logo" class="rvp-logo">
           <span class="brand-name">
             Rapid Viable Product
             <small>GIABO Digital PMO Swarm</small>
           </span>
-        </span>
+        </a>
         <div class="nav-links">
           <a href="/guide">Agent Handbook</a>
           <a href="/privacy">Privacy</a>

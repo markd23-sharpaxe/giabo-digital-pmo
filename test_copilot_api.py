@@ -329,7 +329,12 @@ def test_get_usage_telemetry_default_tenant(client: TestClient, tenant_id: uuid.
 def test_dashboard_routes_removed_legal_routes_survive(client: TestClient) -> None:
     _section("Part 4: dashboard routes removed; legal + marketplace routes survive")
 
-    _check("GET / is now 404 (marketing homepage removed)", client.get("/").status_code == 404)
+    home_resp = client.get("/")
+    _check("GET / returns 200 (public marketing homepage)", home_resp.status_code == 200)
+    if home_resp.status_code == 200:
+        _check("homepage links the official RVP logo", "/static/images/logo.png" in home_resp.text)
+        _check("homepage names the Digital PMO employee", "Digital PMO" in home_resp.text)
+        _check("homepage links the Agent Handbook", 'href="/guide"' in home_resp.text)
     _check("GET /dashboard is now 404 (tenant dashboard removed)", client.get("/dashboard").status_code == 404)
     _check(
         "GET /dashboard/{tenant_id} is now 404 (tenant dashboard removed)",
