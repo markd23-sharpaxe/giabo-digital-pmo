@@ -45,7 +45,7 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: radial-gradient(ellipse 120% 80% at 50% -10%, #0e1830 0%, var(--bg-primary) 55%) fixed;
+  background: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-body);
   line-height: 1.55;
@@ -95,7 +95,87 @@ p {
    Layout shell
    ----------------------------------------------------------------------------- */
 
+.mesh-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.mesh-orb {
+  position: absolute;
+  display: block;
+  width: 78vmax;
+  height: 78vmax;
+  border-radius: 50%;
+  will-change: transform;
+  filter: blur(72px);
+  transform: translate3d(0, 0, 0);
+}
+
+.mesh-orb-a {
+  top: -28vmax;
+  left: -18vmax;
+  opacity: 0.34;
+  background: radial-gradient(circle at 40% 40%, #00f2fe 0%, rgba(0, 242, 254, 0) 62%);
+  animation: mesh-drift-a 34s ease-in-out infinite alternate;
+}
+
+.mesh-orb-b {
+  top: 18vmax;
+  right: -24vmax;
+  opacity: 0.3;
+  background: radial-gradient(circle at 50% 50%, #0284c7 0%, rgba(2, 132, 199, 0) 64%);
+  animation: mesh-drift-b 40s ease-in-out infinite alternate;
+}
+
+.mesh-orb-c {
+  bottom: -30vmax;
+  left: 12vmax;
+  opacity: 0.28;
+  background: radial-gradient(circle at 45% 45%, #4c1d95 0%, #312e81 38%, rgba(49, 46, 129, 0) 66%);
+  animation: mesh-drift-c 28s ease-in-out infinite alternate;
+}
+
+@keyframes mesh-drift-a {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(12vmax, 8vmax, 0) scale(1.08);
+  }
+}
+
+@keyframes mesh-drift-b {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.04);
+  }
+  to {
+    transform: translate3d(-14vmax, -6vmax, 0) scale(0.94);
+  }
+}
+
+@keyframes mesh-drift-c {
+  from {
+    transform: translate3d(0, 0, 0) scale(0.96);
+  }
+  to {
+    transform: translate3d(8vmax, -10vmax, 0) scale(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesh-orb-a,
+  .mesh-orb-b,
+  .mesh-orb-c {
+    animation: none;
+  }
+}
+
 .site-wrap {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
