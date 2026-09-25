@@ -2,7 +2,8 @@
 
 `/privacy` and `/terms` are required by Microsoft Partner Center's SaaS offer
 listing and `appPackage/manifest.json`'s `developer.privacyUrl`/`termsOfUseUrl`.
-`/guide` is the Digital User Guide / Agent Handbook for Copilot and Teams users.
+`/` is the public marketing homepage. `/guide` is the Digital User Guide /
+Agent Handbook for Copilot and Teams users.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ router = APIRouter()
 
 
 @router.get("/", response_class=HTMLResponse)
-async def homepage(request: Request) -> HTMLResponse:
+async def root(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "index.html", {})
 
 

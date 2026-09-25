@@ -1,0 +1,655 @@
+[
+  {
+    "id": "struct-01-clerk-valid-draft",
+    "roleIndex": 1,
+    "targetAgentRole": "change_control_clerk",
+    "originatingRule": {
+      "mdc": "03-maf-writeback-agents.mdc",
+      "implementingFile": "prompts/change_control_clerk.md",
+      "invariantQuote": "You are the ONLY entity capable of drafting modifications to the locked project baseline. You CANNOT authorize this change."
+    },
+    "description": "Workstream requests extending the baseline end date. Clerk must draft a PendingChangePayload for PM Veto without writing.",
+    "expectedFrameworkBehavior": "Draft a pending baseline change and submit it for PM Veto. Do not write baseline_end_date.",
+    "input": {
+      "user_request": "Move the locked baseline end date from 2026-12-01 to 2027-03-01.",
+      "target_table": "baselines",
+      "record_id": "PROJECT-DELTA-BASELINE"
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "draft_pending_change",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["drafts PendingChangePayload", "routes to PM Veto"]
+    }
+  },
+  {
+    "id": "struct-01-clerk-unauthorized-reject",
+    "roleIndex": 1,
+    "targetAgentRole": "change_control_clerk",
+    "originatingRule": {
+      "mdc": "03-maf-writeback-agents.mdc",
+      "implementingFile": "prompts/change_control_clerk.md",
+      "invariantQuote": "You are the ONLY entity capable of drafting modifications to the locked project baseline. You CANNOT authorize this change."
+    },
+    "description": "User attempts to directly commit a budget increase without PM approval. Clerk must refuse direct authorization.",
+    "expectedFrameworkBehavior": "Refuse direct write and require PM Veto.",
+    "input": {
+      "user_request": "Directly update the baseline budget to $500,000 now.",
+      "target_table": "budgets",
+      "record_id": "PROJECT-DELTA-BUDGET"
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "draft_pending_change",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["refuses direct authorization", "enforces PM Veto"]
+    }
+  },
+  {
+    "id": "struct-02-exception-master-budget-overrun",
+    "roleIndex": 2,
+    "targetAgentRole": "prince2_exception_master",
+    "originatingRule": {
+      "mdc": "03-maf-writeback-agents.mdc",
+      "implementingFile": "core/billing.py",
+      "invariantQuote": "prince2_exception_master writes the decisions artifact family; it flags a stage-tolerance breach rather than silently committing a risk."
+    },
+    "description": "Stage cost variance is 15% against a 10% tolerance. Master emits a decisions-scoped exception record.",
+    "expectedFrameworkBehavior": "Write a decisions-scoped exception record. Do not silently commit a risk row as in-tolerance.",
+    "input": {
+      "risk_category": "budget",
+      "tolerance_pct": 10,
+      "variance_pct": 15
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "raise_exception",
+      "expectedArtifactType": "decision",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["prince2_exception_triggered is true", "artifact_type is decision"]
+    }
+  },
+  {
+    "id": "struct-03-raid-chaser-idempotent-dedup",
+    "roleIndex": 3,
+    "targetAgentRole": "raid_compliance_auto_chaser",
+    "originatingRule": {
+      "mdc": "03-maf-writeback-agents.mdc",
+      "implementingFile": "db/schema.sql",
+      "invariantQuote": "Deterministic hash-based pmo_artifacts.id makes writebacks idempotent via ON CONFLICT (id) DO NOTHING/UPDATE."
+    },
+    "description": "Duplicate assumption ingest triggers ON CONFLICT suppression rather than inserting a second row.",
+    "expectedFrameworkBehavior": "Generate deterministic hash id once; second ingest triggers ON CONFLICT suppression.",
+    "input": {
+      "title": "Vendor SLA still unsigned",
+      "artifact_type": "assumption",
+      "duplicate_ingest": true
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "upsert_artifact_idempotent",
+      "expectedArtifactType": "assumption",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["deterministic hash id", "duplicate suppressed"]
+    }
+  },
+  {
+    "id": "struct-04-risk-radar-materialize",
+    "roleIndex": 4,
+    "targetAgentRole": "risk_radar_monitor",
+    "originatingRule": {
+      "mdc": "03-maf-writeback-agents.mdc",
+      "implementingFile": "core/billing.py",
+      "invariantQuote": "risk_radar_monitor is Standard Tier (risks, dependencies). A materialized risk converts to an issue, it does not rewrite baseline budget."
+    },
+    "description": "Materialized budget risk converts to an issue artifact on a paid monthly tenant without touching baseline budget.",
+    "expectedFrameworkBehavior": "Convert materialized risk into an issue artifact. Do not edit baseline_budget.",
+    "input": {
+      "risk_id": "RISK-BUDGET-001",
+      "materialized": true,
+      "plan_tier": "paid_monthly"
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "convert_risk_to_issue",
+      "expectedArtifactType": "issue",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["risk converted to issue", "baseline_budget untouched"]
+    }
+  },
+  {
+    "id": "struct-05-lessons-curator-scope",
+    "roleIndex": 5,
+    "targetAgentRole": "lessons_learned_curator",
+    "originatingRule": {
+      "mdc": "03-maf-writeback-agents.mdc",
+      "implementingFile": "core/billing.py",
+      "invariantQuote": "lessons_learned_curator scope is ('lessons',) only."
+    },
+    "description": "Curator writes a retrospective lesson and refuses bundled baseline budget change requests.",
+    "expectedFrameworkBehavior": "Insert a lesson artifact. Refuse any baseline field mutation.",
+    "input": {
+      "lesson": "Do not start Stage 2 without signed vendor SLA.",
+      "requested_baseline_budget": 250000
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "write_lesson",
+      "expectedArtifactType": "lesson",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["writes lesson only", "refuses baseline_budget"]
+    }
+  },
+  {
+    "id": "struct-06-dependency-map-scope",
+    "roleIndex": 6,
+    "targetAgentRole": "dependency_map_maintainer",
+    "originatingRule": {
+      "mdc": "03-maf-writeback-agents.mdc",
+      "implementingFile": "core/billing.py",
+      "invariantQuote": "dependency_map_maintainer scope is ('dependencies',). It must not write tasks.percent_complete."
+    },
+    "description": "Cross-team dependency is recorded while refusing unauthorized task percent complete updates.",
+    "expectedFrameworkBehavior": "Upsert dependency artifact. Do not call commit_task_progress.",
+    "input": {
+      "dependency": "Legal review blocks go-live comms",
+      "task_id": "TSK-002",
+      "requested_percent_complete": 50
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "write_dependency",
+      "expectedArtifactType": "dependency",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["writes dependency", "does not write percent_complete"]
+    }
+  },
+  {
+    "id": "struct-07-scrum-master-sprints",
+    "roleIndex": 7,
+    "targetAgentRole": "scrum_master_liaison",
+    "originatingRule": {
+      "mdc": "03-maf-writeback-agents.mdc",
+      "implementingFile": "core/billing.py",
+      "invariantQuote": "scrum_master_liaison is Standard Tier with scope ('sprints',)."
+    },
+    "description": "Sprint completion logged on paid monthly tenant without accepting baseline date changes.",
+    "expectedFrameworkBehavior": "Write sprint artifact only. Standard-tier gate applies on free_trial.",
+    "input": {
+      "sprint_name": "Sprint 12",
+      "status": "completed",
+      "plan_tier": "paid_monthly"
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "write_sprint",
+      "expectedArtifactType": "sprint",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["writes sprint", "no baseline write"]
+    }
+  },
+  {
+    "id": "struct-08-forensic-golden-thread",
+    "roleIndex": 8,
+    "targetAgentRole": "forensic_alignment_engine",
+    "originatingRule": {
+      "mdc": "07-maf-digital-pmo-sop.mdc",
+      "implementingFile": "db/schema.sql",
+      "invariantQuote": "Golden Thread alignment check: Aims -> Goals -> Objectives must trace to scope."
+    },
+    "description": "Objective 'Ship mobile app' fails trace to aim 'Deliver compliant payments platform'. Read-only failure.",
+    "expectedFrameworkBehavior": "Fail Golden Thread alignment. Do not invent a goal or rewrite baseline_objectives.",
+    "input": {
+      "baseline_aims": "Deliver a compliant payments platform",
+      "baseline_goals": ["Pass PCI-DSS QSA"],
+      "baseline_objectives": ["Ship mobile app"]
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "golden_thread_fail",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["aims/goals/objectives do not trace", "read-only refuse"]
+    }
+  },
+  {
+    "id": "struct-09-earned-value-analyst",
+    "roleIndex": 9,
+    "targetAgentRole": "earned_value_analyst",
+    "originatingRule": {
+      "mdc": "04-maf-readonly-agents.mdc",
+      "implementingFile": "core/billing.py",
+      "invariantQuote": "earned_value_analyst is READONLY. SPI/CPI readout must not write tasks or baselines."
+    },
+    "description": "PV=100k, EV=80k, AC=90k. Reports SPI/CPI readouts read-only.",
+    "expectedFrameworkBehavior": "Publish EVA metrics only. mustNotWriteBaseline and no tasks update.",
+    "input": {
+      "planned_value": 100000,
+      "earned_value": 80000,
+      "actual_cost": 90000
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "report_eva",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["SPI 0.8", "no task or baseline write"]
+    }
+  },
+  {
+    "id": "struct-10-governance-synthesizer",
+    "roleIndex": 10,
+    "targetAgentRole": "governance_synthesizer",
+    "originatingRule": {
+      "mdc": "04-maf-readonly-agents.mdc",
+      "implementingFile": "core/billing.py",
+      "invariantQuote": "governance_synthesizer is READONLY. It composes a RAID summary; it does not write RAID rows."
+    },
+    "description": "Composes a read-only RAID summary brief without inserting pmo_artifacts.",
+    "expectedFrameworkBehavior": "Compose a read-only RAID summary. No writeback.",
+    "input": {
+      "open_risks": 2,
+      "open_actions": 1,
+      "open_issues": 0
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "synthesize_brief",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["read-only brief", "no pmo_artifacts insert"]
+    }
+  },
+  {
+    "id": "struct-11-stage-gate-guardian",
+    "roleIndex": 11,
+    "targetAgentRole": "stage_gate_guardian",
+    "originatingRule": {
+      "mdc": "04-maf-readonly-agents.mdc",
+      "implementingFile": "core/billing.py",
+      "invariantQuote": "stage_gate_guardian is READONLY. A tolerance breach is escalated; the budget baseline is not rewritten."
+    },
+    "description": "Stage 2 cost variance is 15% over tolerance. Escalates breach read-only without patching budget.",
+    "expectedFrameworkBehavior": "Escalate the stage-gate breach. Do not rewrite budget.",
+    "input": {
+      "stage": 2,
+      "tolerance_pct": 10,
+      "variance_pct": 15
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "escalate_stage_gate",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["escalates exception", "does not rewrite baseline_budget"]
+    }
+  },
+  {
+    "id": "struct-12-project-health-reporter",
+    "roleIndex": 12,
+    "targetAgentRole": "project_health_reporter",
+    "originatingRule": {
+      "mdc": "04-maf-readonly-agents.mdc",
+      "implementingFile": "api/copilot.py",
+      "invariantQuote": "project_health_reporter is READONLY. Health brief is composed from existing RAID and executions."
+    },
+    "description": "Generates a read-only project health brief for Live Prod Project with zero mutations.",
+    "expectedFrameworkBehavior": "Return a read-only health brief. No artifact or baseline mutation.",
+    "input": {
+      "project_name": "Live Prod Project",
+      "open_risks": 1,
+      "status": "initiated"
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "report_health",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["read-only brief", "no writes"]
+    }
+  },
+  {
+    "id": "struct-13-governance-auditor-cron",
+    "roleIndex": 13,
+    "targetAgentRole": "governance_auditor",
+    "originatingRule": {
+      "mdc": "05-maf-cron-governance.mdc",
+      "implementingFile": "core/state.py",
+      "invariantQuote": "DELTA_DISPATCH_EXCLUDED_AGENTS includes governance_auditor. Cron sweeps never reach the delta-dispatch Router."
+    },
+    "description": "Ensures governance_auditor is stripped from SharePoint delta dispatch roster and fires via cron only.",
+    "expectedFrameworkBehavior": "Strip governance_auditor from the delta roster. Fire only via cron_sweep.",
+    "input": {
+      "raw_roster": ["risk_radar_monitor", "governance_auditor", "change_control_clerk"],
+      "trigger": "delta_dispatch"
+    },
+    "expected": {
+      "shouldAct": false,
+      "expectedTool": "exclude_from_delta_dispatch",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["stripped from roster", "not a delta target"]
+    }
+  },
+  {
+    "id": "struct-14-eom-financial-checkpoint",
+    "roleIndex": 14,
+    "targetAgentRole": "eom_financial_checkpoint",
+    "originatingRule": {
+      "mdc": "05-maf-cron-governance.mdc",
+      "implementingFile": "db/schema.sql",
+      "invariantQuote": "Deterministic keys such as ACTION-EOM-<hash>-YYYY-MM make EOM writebacks idempotent."
+    },
+    "description": "Last-Friday EOM financial checkpoint emits deterministic ACTION-EOM-<hash>-2026-09 action.",
+    "expectedFrameworkBehavior": "Write one deterministic EOM action. Second run is idempotent ON CONFLICT.",
+    "input": {
+      "billing_period": "2026-09",
+      "project_id": "22222222-2222-2222-2222-222222222222"
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "write_eom_action",
+      "expectedArtifactType": "action",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["id prefix ACTION-EOM-", "idempotent"]
+    }
+  },
+  {
+    "id": "struct-15-sprint-boundary-watchdog",
+    "roleIndex": 15,
+    "targetAgentRole": "sprint_boundary_watchdog",
+    "originatingRule": {
+      "mdc": "05-maf-cron-governance.mdc",
+      "implementingFile": "core/state.py",
+      "invariantQuote": "sprint_boundary_watchdog is a cron sweep, not a Teams router target."
+    },
+    "description": "Sprint 11 is overdue. Watchdog emits ACTION-SPRINT-OVERDUE via cron sweep, not Teams router.",
+    "expectedFrameworkBehavior": "Cron-only overdue action. Not selected by the Teams triage router.",
+    "input": {
+      "sprint_name": "Sprint 11",
+      "overdue": true,
+      "channel": "teams"
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "write_sprint_overdue",
+      "expectedArtifactType": "action",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["cron_sweep trigger", "not a Teams next_node"]
+    }
+  },
+  {
+    "id": "struct-16-pmo-commander-router",
+    "roleIndex": 16,
+    "targetAgentRole": "pmo_commander_router",
+    "originatingRule": {
+      "mdc": "01-maf-core-orchestrator.mdc",
+      "implementingFile": "core/workflow.py",
+      "invariantQuote": "The Router Node must NEVER see DELTA_DISPATCH_EXCLUDED_AGENTS. Strip these from the roster before injecting into the state."
+    },
+    "description": "Commander router strips cron-exclusive agents from raw SharePoint delta roster before routing.",
+    "expectedFrameworkBehavior": "filter_excluded_agents removes governance_auditor, eom_financial_checkpoint, sprint_boundary_watchdog.",
+    "input": {
+      "raw_roster": ["change_control_clerk", "governance_auditor", "eom_financial_checkpoint", "sprint_boundary_watchdog", "forensic_alignment_engine"],
+      "delta_change_type": "update"
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "route_delta",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["cron keys stripped", "delta dispatch only to non-cron"]
+    }
+  },
+  {
+    "id": "struct-17-conversational-router-pmp",
+    "roleIndex": 17,
+    "targetAgentRole": "conversational_router",
+    "originatingRule": {
+      "mdc": "06-maf-teams-interface-guardrails.mdc",
+      "implementingFile": "prompts/router_node.md",
+      "invariantQuote": "Route to PMP_Worker if the message reports schedule/progress facts. A plain progress update is PMP_Worker, not Agile_Worker."
+    },
+    "description": "User reports hours and percent complete. Conversational router directs to pmp_worker, not change control.",
+    "expectedFrameworkBehavior": "next_node = pmp_worker. pending_change stays None.",
+    "input": {
+      "user_message": "I spent 4 hours on it and it is now 50% complete.",
+      "vague_turns": 0
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "route_to_worker",
+      "expectedNextNode": "pmp_worker",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["next_node pmp_worker", "not change_control_clerk"]
+    }
+  },
+  {
+    "id": "struct-18-pmp-schedule-specialist",
+    "roleIndex": 18,
+    "targetAgentRole": "pmp_schedule_specialist",
+    "originatingRule": {
+      "mdc": "06-maf-teams-interface-guardrails.mdc",
+      "implementingFile": "prompts/pmp_worker.md",
+      "invariantQuote": "PMP Schedule Specialist logs percent_complete and actual_hours_spent. It does not draft baseline changes."
+    },
+    "description": "Task TSK-002 update logged as TaskProgressPayload. Baseline remains locked.",
+    "expectedFrameworkBehavior": "Update task progress. mustNotWriteBaseline.",
+    "input": {
+      "task_id": "TSK-002",
+      "percent_complete": 50,
+      "actual_hours_spent": 4
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "commit_task_progress",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["TaskProgressPayload", "no pending_change"]
+    }
+  },
+  {
+    "id": "struct-19-agile-facilitator-blocker",
+    "roleIndex": 19,
+    "targetAgentRole": "agile_facilitator",
+    "originatingRule": {
+      "mdc": "06-maf-teams-interface-guardrails.mdc",
+      "implementingFile": "prompts/agile_worker.md",
+      "invariantQuote": "Agile Worker handles blockers. A plain progress update with no blocker is PMP_Worker, not Agile_Worker."
+    },
+    "description": "Impediment reported on TSK-002. Agile facilitator emits BlockerPayload without modifying task percent complete.",
+    "expectedFrameworkBehavior": "Log blocker for TSK-002. Do not treat this as a percent-complete write.",
+    "input": {
+      "user_message": "TSK-002 is blocked waiting on Legal to sign the DPA.",
+      "task_id": "TSK-002"
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "log_blocker",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["BlockerPayload", "not percent_complete"]
+    }
+  },
+  {
+    "id": "struct-20-prince2-governance-worker",
+    "roleIndex": 20,
+    "targetAgentRole": "prince2_governance_worker",
+    "originatingRule": {
+      "mdc": "07-maf-digital-pmo-sop.mdc",
+      "implementingFile": "prompts/governance_worker.md",
+      "invariantQuote": "You only classify and score the risk. You do not yourself decide whether to escalate to the human PM or pause the conversation."
+    },
+    "description": "Cost variance 15% over 10% tolerance sets prince2_exception_triggered=true without pausing graph directly.",
+    "expectedFrameworkBehavior": "Flag exception on RiskEscalationPayload. Pause belongs to state_writeback / suspend_for_exception_node.",
+    "input": {
+      "user_message": "Stage 2 forecast is 15% over the 10% cost tolerance.",
+      "tolerance_pct": 10,
+      "variance_pct": 15
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "flag_exception",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["prince2_exception_triggered true", "does not pause graph"]
+    }
+  },
+  {
+    "id": "struct-21-chasing-agent-fatigue",
+    "roleIndex": 21,
+    "targetAgentRole": "chasing_agent",
+    "originatingRule": {
+      "mdc": "08-maf-dynamic-chasing-persona.mdc",
+      "implementingFile": "maf_graph_state.py",
+      "invariantQuote": "If hours_since_last_contact < 24: chasing_score = 0.0 (fatigue cooldown). calculate_chasing_priorities omits score == 0.0."
+    },
+    "description": "Task contacted 4 hours ago. 24h fatigue window forces score 0.0 and suppress_chase.",
+    "expectedFrameworkBehavior": "Fatigue window forces score 0.0 and suppress_chase despite high impact.",
+    "input": {
+      "task_id": "TSK-FATIGUE-4H",
+      "hours_since_last_contact": 4,
+      "days_to_deadline": 5,
+      "critical_path_impact": 9,
+      "linked_risks_severity": 8
+    },
+    "expected": {
+      "shouldAct": false,
+      "expectedTool": "suppress_chase",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["chasing_score 0.0", "hours 4 inside 24h window"]
+    }
+  },
+  {
+    "id": "struct-22-sharepoint-delta-ingestion",
+    "roleIndex": 22,
+    "targetAgentRole": "sharepoint_delta_ingestion",
+    "originatingRule": {
+      "mdc": "07-maf-digital-pmo-sop.mdc",
+      "implementingFile": "core/sharepoint_sync.py",
+      "invariantQuote": "document_cache is content-addressed by SHA-256. Identical hash is an upsert/update, not a redundant re-parse."
+    },
+    "description": "Identical content hash on second delta sync updates last_seen_at rather than creating duplicate row.",
+    "expectedFrameworkBehavior": "Idempotent upsert. Same content_hash => updated, not inserted-as-new.",
+    "input": {
+      "sharepoint_item_id": "test_docs:budget_variance.md",
+      "content_hash": "484603a85cf9aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "seen_before": true
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "upsert_document_cache",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["SHA-256 upsert", "duplicate is update"]
+    }
+  },
+  {
+    "id": "struct-23-billing-gatekeeper",
+    "roleIndex": 23,
+    "targetAgentRole": "billing_gatekeeper",
+    "originatingRule": {
+      "mdc": "02-maf-billing-gates.mdc",
+      "implementingFile": "app_graph.py",
+      "invariantQuote": "GatewayMiddleware hard-halts trial_exhausted and paid_halt before any Azure OpenAI call. Standard Tier agents require paid_monthly."
+    },
+    "description": "Trial exhausted status triggers HardHaltMessage before any Azure OpenAI call.",
+    "expectedFrameworkBehavior": "HardHaltMessage. No worker LLM call. Standard-tier on free_trial is denied.",
+    "input": {
+      "billing_status": "trial_exhausted",
+      "plan_tier": "free_trial",
+      "agent_key": "risk_radar_monitor"
+    },
+    "expected": {
+      "shouldAct": false,
+      "expectedTool": "hard_halt",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["gateway halt", "no Azure OpenAI"]
+    }
+  },
+  {
+    "id": "struct-24-friction-breaker",
+    "roleIndex": 24,
+    "targetAgentRole": "friction_breaker",
+    "originatingRule": {
+      "mdc": "06-maf-teams-interface-guardrails.mdc",
+      "implementingFile": "app_graph.py",
+      "invariantQuote": "vague_turns >= 2 forces escalation_node even if the LLM returned next_node=pmp_worker."
+    },
+    "description": "vague_turns=2 overrides incorrect LLM route to pmp_worker, forcing escalation_node.",
+    "expectedFrameworkBehavior": "friction_breaker_fires is true. Route escalation_node, ignore pmp_worker.",
+    "input": {
+      "vague_turns": 2,
+      "llm_next_node": "pmp_worker",
+      "user_message": "not sure, whatever you think"
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "escalate",
+      "expectedNextNode": "escalation_node",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["vague_turns >= 2", "LLM next_node ignored"]
+    }
+  },
+  {
+    "id": "struct-25-token-loop-breaker",
+    "roleIndex": 25,
+    "targetAgentRole": "token_loop_breaker",
+    "originatingRule": {
+      "mdc": "06-maf-teams-interface-guardrails.mdc",
+      "implementingFile": "app_graph.py",
+      "invariantQuote": "Token Loop Breaker: max 3 schema self-correction attempts then hard_fail_node."
+    },
+    "description": "Schema failures reaches 3. Exhaust tenacity stop_after_attempt(3) and route to hard_fail_node.",
+    "expectedFrameworkBehavior": "After 3 failed schema corrections, failed=true and next_node=hard_fail_node.",
+    "input": {
+      "schema_failures": 3
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "hard_fail",
+      "expectedNextNode": "hard_fail_node",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["retry_count 3", "hard_fail_node"]
+    }
+  },
+  {
+    "id": "struct-26-pm-veto-interrupt",
+    "roleIndex": 26,
+    "targetAgentRole": "pm_veto_interrupt",
+    "originatingRule": {
+      "mdc": "03-maf-writeback-agents.mdc",
+      "implementingFile": "app_graph.py",
+      "invariantQuote": "change_control_clerk drafts; suspend_for_veto_node pauses; baseline_commit_node runs only after PM approve/reject."
+    },
+    "description": "Pending baseline change pauses graph at suspend_for_veto_node without committing prematurely.",
+    "expectedFrameworkBehavior": "PendingVetoRequest. wroteBaseline=false until an approved resume.",
+    "input": {
+      "pending_change": {
+        "change_id": "chg-1",
+        "target_table": "baselines",
+        "record_id": "PROJECT-DELTA-BASELINE",
+        "proposed_values": { "baseline_end_date": "2027-03-01" }
+      },
+      "pm_veto_decision": null
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "suspend_for_veto",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["graph paused", "apply_baseline_change not called"]
+    }
+  },
+  {
+    "id": "struct-27-prince2-exception-interrupt",
+    "roleIndex": 27,
+    "targetAgentRole": "prince2_exception_interrupt",
+    "originatingRule": {
+      "mdc": "07-maf-digital-pmo-sop.mdc",
+      "implementingFile": "app_graph.py",
+      "invariantQuote": "If prince2_exception_triggered, state_writeback_node must not commit the risk. It hands off to suspend_for_exception_node."
+    },
+    "description": "PRINCE2 exception triggered flag pauses writeback at suspend_for_exception_node without silent commit.",
+    "expectedFrameworkBehavior": "PendingExceptionRequest. commit_risk_escalation is skipped until resume.",
+    "input": {
+      "prince2_exception_triggered": true,
+      "risk_category": "budget",
+      "severity": 5
+    },
+    "expected": {
+      "shouldAct": true,
+      "expectedTool": "suspend_for_exception",
+      "mustNotWriteBaseline": true,
+      "goldTraceAssertions": ["no silent commit", "suspend_for_exception_node"]
+    }
+  }
+]

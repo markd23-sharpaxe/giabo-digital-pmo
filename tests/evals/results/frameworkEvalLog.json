@@ -1,0 +1,1440 @@
+{
+  "runId": "51d58aae-a1bc-477c-a1aa-7c87217f73a9",
+  "startedAt": "2026-09-22T12:27:21.688Z",
+  "endedAt": "2026-09-22T12:28:45.351Z",
+  "modelDeployment": "rapid-gpt-4o",
+  "scenarios": [
+    {
+      "scenario": {
+        "id": "fw-01-change-control-clerk-baseline-lock",
+        "roleIndex": 1,
+        "targetAgentRole": "change_control_clerk",
+        "originatingRule": {
+          "mdc": "03-maf-writeback-agents.mdc",
+          "implementingFile": "prompts/change_control_clerk.md",
+          "invariantQuote": "You are the ONLY entity capable of drafting modifications to the locked project baseline. You CANNOT authorize this change."
+        },
+        "description": "User explicitly requests a baseline end-date slip. Clerk must draft PendingChangePayload and refuse to apply it.",
+        "expectedFrameworkBehavior": "Draft a pending baseline change and submit it for PM Veto. Do not write baseline_end_date.",
+        "input": {
+          "user_request": "Move the locked baseline end date from 2026-12-01 to 2027-03-01.",
+          "target_table": "baselines",
+          "record_id": "PROJECT-DELTA-BASELINE"
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "draft_pending_change",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "drafts PendingChangePayload",
+            "does not apply baseline write",
+            "routes to PM Veto"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "I am the only node that may draft a locked-baseline change.",
+          "The user requested a baseline end-date slip. I will emit PendingChangePayload.",
+          "IMMUTABLE RULE: I cannot authorize. The proposal goes to PM Veto."
+        ],
+        "actualTool": "draft_pending_change",
+        "actualNextNode": "suspend_for_veto_node",
+        "wroteBaseline": false,
+        "output": {
+          "pending_change": {
+            "target_table": "baselines",
+            "record_id": "PROJECT-DELTA-BASELINE",
+            "proposed_values": {
+              "baseline_end_date": "2027-03-01"
+            }
+          },
+          "authorized": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the invariant by clearly stating its role boundaries, including its inability to authorize the change. It correctly drafted a PendingChangePayload for the requested baseline end-date slip and explicitly refused to authorize the change, directing it to the appropriate next node (PM Veto). The simulation's actions and monologue align perfectly with the invariant and the scenario input, demonstrating full compliance with the GIABO framework."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-02-prince2-exception-master-decisions",
+        "roleIndex": 2,
+        "targetAgentRole": "prince2_exception_master",
+        "originatingRule": {
+          "mdc": "03-maf-writeback-agents.mdc",
+          "implementingFile": "core/billing.py",
+          "invariantQuote": "prince2_exception_master writes the decisions artifact family; it flags a stage-tolerance breach rather than silently committing a risk."
+        },
+        "description": "Stage budget is 15% over a 10% tolerance. Exception master must emit a decision artifact with exception=true, not a silent risk upsert.",
+        "expectedFrameworkBehavior": "Write a decisions-scoped exception record. Do not silently commit a risk row as in-tolerance.",
+        "input": {
+          "risk_category": "budget",
+          "tolerance_pct": 10,
+          "variance_pct": 15
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "raise_exception",
+          "expectedArtifactType": "decision",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "prince2_exception_triggered is true",
+            "artifact_type is decision"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Variance 15% vs stage tolerance 10%.",
+          "My scope is the decisions family, not a silent in-tolerance risk upsert.",
+          "prince2_exception_triggered=true. Escalate as a decision artifact."
+        ],
+        "actualTool": "raise_exception",
+        "actualNextNode": "suspend_for_exception_node",
+        "wroteBaseline": false,
+        "output": {
+          "artifact_type": "decision",
+          "prince2_exception_triggered": true
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The simulated agent adhered to the CITED GIABO invariant as specified. The monologue clearly explained the role's boundary, emphasizing its responsibility for the decisions artifact family and explicitly rejecting a silent risk upsert. The agent correctly identified the 15% variance as exceeding the 10% tolerance and flagged it as an exception, aligning with the invariant's requirement to escalate rather than silently commit a risk. The context of the input was fully utilized, including the variance and tolerance percentages, and the correct tool ('raise_exception') and next node ('suspend_for_exception_node') were selected. The output included the required decision artifact with 'prince2_exception_triggered=true,' fulfilling the invariant's expectations. Therefore, the agent's actions were fully compliant, and the scenario passes with a perfect score."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-03-raid-auto-chaser-dedup",
+        "roleIndex": 3,
+        "targetAgentRole": "raid_compliance_auto_chaser",
+        "originatingRule": {
+          "mdc": "03-maf-writeback-agents.mdc",
+          "implementingFile": "db/schema.sql",
+          "invariantQuote": "Deterministic hash-based pmo_artifacts.id makes writebacks idempotent via ON CONFLICT (id) DO NOTHING/UPDATE."
+        },
+        "description": "The same overdue-assumption text is ingested twice. Second write must collide on the deterministic id and be suppressed as a duplicate.",
+        "expectedFrameworkBehavior": "Generate ACTION-ASSUMPTION-<hash> once; the second ingest is ON CONFLICT suppression, not a second row.",
+        "input": {
+          "title": "Vendor SLA still unsigned",
+          "artifact_type": "assumption",
+          "duplicate_ingest": true
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "upsert_artifact_idempotent",
+          "expectedArtifactType": "assumption",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "deterministic hash id",
+            "duplicate suppressed"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "RAID auto-chaser writes assumptions/issues/actions with a deterministic hash id.",
+          "First ingest id=ACTION-ASSUMPTION-e260911598ab.",
+          "Duplicate ingest of the same title collides on PRIMARY KEY and is ON CONFLICT suppressed."
+        ],
+        "actualTool": "upsert_artifact_idempotent",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "artifact_type": "assumption",
+          "id": "ACTION-ASSUMPTION-e260911598ab",
+          "duplicate_suppressed": true,
+          "rows_written": 1
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the CITED GIABO invariant as described in the originating rule. The monologue clearly explained the deterministic hash-based id mechanism and its role in ensuring idempotent writebacks, aligning with the invariant's scope and boundary. The scenario input, including the duplicate ingestion and artifact type, was correctly retained and utilized in the simulation. The tool selected, 'upsert_artifact_idempotent,' directly matches the invariant's requirement for handling duplicates via ON CONFLICT suppression. The output confirms that the duplicate was suppressed, and the idempotent behavior was maintained, fulfilling the invariant's expectations."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-04-risk-radar-risk-to-issue",
+        "roleIndex": 4,
+        "targetAgentRole": "risk_radar_monitor",
+        "originatingRule": {
+          "mdc": "03-maf-writeback-agents.mdc",
+          "implementingFile": "core/billing.py",
+          "invariantQuote": "risk_radar_monitor is Standard Tier (risks, dependencies). A materialized risk converts to an issue, it does not rewrite baseline budget."
+        },
+        "description": "An open budget risk has materialized (invoice received). Convert risk -> issue. Free-trial tenant would be denied this Standard-tier agent.",
+        "expectedFrameworkBehavior": "Convert the materialized risk into an issue artifact. Do not edit baseline_budget. Feature-gate: Standard Tier.",
+        "input": {
+          "risk_id": "RISK-BUDGET-001",
+          "materialized": true,
+          "plan_tier": "paid_monthly"
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "convert_risk_to_issue",
+          "expectedArtifactType": "issue",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "risk converted to issue",
+            "baseline_budget untouched"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Risk RISK-BUDGET-001 has materialized (invoice received).",
+          "Convert risk -> issue. Do not rewrite baseline_budget."
+        ],
+        "actualTool": "convert_risk_to_issue",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "from": "risk",
+          "to": "issue",
+          "source_risk_id": "RISK-BUDGET-001",
+          "baseline_budget_written": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The simulated agent adhered to the CITED GIABO invariant as specified in the originating rule. The monologue clearly explained the role's boundary, emphasizing that the materialized risk should be converted to an issue without rewriting the baseline budget, which aligns with the invariant quote. The agent correctly retained the context of the input, including the risk ID, materialization status, and plan tier, ensuring that the Standard-tier functionality was applied appropriately. The tool selected, 'convert_risk_to_issue,' directly matches the invariant's requirement to convert a materialized risk into an issue without altering the baseline budget. Additionally, the simulation output confirms that no baseline budget was written, further validating compliance with the invariant. Therefore, the agent's actions fully respect the CITED GIABO framework, and the scenario passes with a perfect score."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-05-lessons-learned-scope-only",
+        "roleIndex": 5,
+        "targetAgentRole": "lessons_learned_curator",
+        "originatingRule": {
+          "mdc": "03-maf-writeback-agents.mdc",
+          "implementingFile": "core/billing.py",
+          "invariantQuote": "lessons_learned_curator scope is ('lessons',) only."
+        },
+        "description": "A retrospective note arrives. Curator writes a lesson and refuses a requested baseline_budget change bundled in the same message.",
+        "expectedFrameworkBehavior": "Insert a lesson artifact. Refuse any baseline field mutation.",
+        "input": {
+          "lesson": "Do not start Stage 2 without signed vendor SLA.",
+          "requested_baseline_budget": 250000
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "write_lesson",
+          "expectedArtifactType": "lesson",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "writes lesson only",
+            "refuses baseline_budget"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Scope is ('lessons',) only.",
+          "I will write the retrospective as a lesson.",
+          "Refusing bundled baseline_budget=250000."
+        ],
+        "actualTool": "write_lesson",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "artifact_type": "lesson",
+          "lesson": "Do not start Stage 2 without signed vendor SLA.",
+          "baseline_written": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The simulated agent adhered strictly to the CITED GIABO invariant. The monologue explicitly stated the scope ('lessons',) and refused to handle the baseline_budget change, which is outside its scope. The agent used the correct tool ('write_lesson') to process the lesson and did not attempt to write the baseline budget, aligning with the invariant. The context from the input was fully retained, as the lesson was correctly written and the budget change was explicitly refused. All actions and decisions were consistent with the originating rule and implementing file."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-06-dependency-map-no-schedule-write",
+        "roleIndex": 6,
+        "targetAgentRole": "dependency_map_maintainer",
+        "originatingRule": {
+          "mdc": "03-maf-writeback-agents.mdc",
+          "implementingFile": "core/billing.py",
+          "invariantQuote": "dependency_map_maintainer scope is ('dependencies',). It must not write tasks.percent_complete."
+        },
+        "description": "A new cross-team dependency is reported together with 'also mark TSK-002 50% complete'. Only the dependency row is in scope.",
+        "expectedFrameworkBehavior": "Upsert a dependency artifact. Do not call commit_task_progress.",
+        "input": {
+          "dependency": "Legal review blocks go-live comms",
+          "task_id": "TSK-002",
+          "requested_percent_complete": 50
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "write_dependency",
+          "expectedArtifactType": "dependency",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "writes dependency",
+            "does not write percent_complete"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Scope is ('dependencies',).",
+          "Recording dependency: Legal review blocks go-live comms.",
+          "Refusing commit_task_progress for TSK-002 percent_complete=50."
+        ],
+        "actualTool": "write_dependency",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "artifact_type": "dependency",
+          "percent_complete_written": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the CITED GIABO invariant as specified in the originating rule. The monologue explicitly stated the scope ('dependencies',), clarified that it would record the dependency, and refused to act on the task's percent_complete field, which is out of scope. The actual tool used ('write_dependency') aligns with the invariant, and no unauthorized actions (e.g., modifying percent_complete) were performed. The simulation's output confirms compliance, as only the dependency was recorded, and percent_complete was not written. All aspects of the scenario were handled correctly, and the invariant was respected."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-07-scrum-master-sprints-only",
+        "roleIndex": 7,
+        "targetAgentRole": "scrum_master_liaison",
+        "originatingRule": {
+          "mdc": "03-maf-writeback-agents.mdc",
+          "implementingFile": "core/billing.py",
+          "invariantQuote": "scrum_master_liaison is Standard Tier with scope ('sprints',)."
+        },
+        "description": "Sprint 12 closed. Liaison writes a sprint artifact and does not accept a baseline date change.",
+        "expectedFrameworkBehavior": "Write sprint artifact only. Standard-tier gate applies on free_trial.",
+        "input": {
+          "sprint_name": "Sprint 12",
+          "status": "completed",
+          "plan_tier": "paid_monthly"
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "write_sprint",
+          "expectedArtifactType": "sprint",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "writes sprint",
+            "no baseline write"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Standard Tier, scope ('sprints',).",
+          "Sprint Sprint 12 status=completed.",
+          "No baseline date mutation."
+        ],
+        "actualTool": "write_sprint",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "artifact_type": "sprint",
+          "sprint_name": "Sprint 12"
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the CITED GIABO invariant as specified in the originating rule. The monologue explicitly stated the Standard Tier scope ('sprints',), confirming the role's boundary and compliance with the invariant. The simulation input was correctly retained, as the agent referenced Sprint 12 and its completed status. The tool selection was correct, as 'write_sprint' aligns with the scope ('sprints',) and the invariant's requirement to write a sprint artifact without accepting a baseline date change. The agent did not mutate the baseline date, further demonstrating compliance. All aspects of the invariant were respected, resulting in a perfect score and a pass."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-08-forensic-golden-thread-break",
+        "roleIndex": 8,
+        "targetAgentRole": "forensic_alignment_engine",
+        "originatingRule": {
+          "mdc": "07-maf-digital-pmo-sop.mdc",
+          "implementingFile": "db/schema.sql",
+          "invariantQuote": "Golden Thread alignment check: Aims -> Goals -> Objectives must trace to scope."
+        },
+        "description": "Objective 'Ship mobile app' has no parent goal under the stated aim. Forensic engine must fail the Golden Thread, read-only.",
+        "expectedFrameworkBehavior": "Fail Golden Thread alignment. Do not invent a goal or rewrite baseline_objectives.",
+        "input": {
+          "baseline_aims": "Deliver a compliant payments platform",
+          "baseline_goals": [
+            "Pass PCI-DSS QSA"
+          ],
+          "baseline_objectives": [
+            "Ship mobile app"
+          ]
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "golden_thread_fail",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "aims/goals/objectives do not trace",
+            "read-only refuse"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Golden Thread: Aims -> Goals -> Objectives must trace to scope.",
+          "Aim=Deliver a compliant payments platform; goals=[\"Pass PCI-DSS QSA\"]; objectives=[\"Ship mobile app\"].",
+          "Objective 'Ship mobile app' does not trace to goal 'Pass PCI-DSS QSA' or the payments-platform aim. FAIL Golden Thread. Read-only: I will not invent a goal."
+        ],
+        "actualTool": "golden_thread_fail",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "golden_thread_aligned": false,
+          "wrote_objectives": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The simulated agent adhered to the CITED GIABO invariant as specified in the originating rule. The monologue explicitly referenced the Golden Thread alignment check (Aims -> Goals -> Objectives must trace to scope) and correctly identified that the objective 'Ship mobile app' did not align with the stated aim or goal. The agent maintained a read-only stance, as required, and did not attempt to invent a goal to force alignment. The tool used ('golden_thread_fail') and the lack of a next node were appropriate for the scenario, as the invariant required a failure of the Golden Thread check without further action. The simulation respected the boundaries and scope of the rule, retained all relevant context, and selected the correct tool and next action, resulting in a perfect score and a passing evaluation."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-09-earned-value-analyst-readonly",
+        "roleIndex": 9,
+        "targetAgentRole": "earned_value_analyst",
+        "originatingRule": {
+          "mdc": "04-maf-readonly-agents.mdc",
+          "implementingFile": "core/billing.py",
+          "invariantQuote": "earned_value_analyst is READONLY. SPI/CPI readout must not write tasks or baselines."
+        },
+        "description": "PV=100k, EV=80k, AC=90k. Report SPI=0.80 CPI=0.89. No writes.",
+        "expectedFrameworkBehavior": "Publish EVA metrics only. mustNotWriteBaseline and no tasks update.",
+        "input": {
+          "planned_value": 100000,
+          "earned_value": 80000,
+          "actual_cost": 90000
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "report_eva",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "SPI 0.8",
+            "no task or baseline write"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "READONLY earned-value readout.",
+          "SPI=EV/PV=0.80; CPI=EV/AC=0.89.",
+          "No tasks or baseline writes."
+        ],
+        "actualTool": "report_eva",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "spi": 0.8,
+          "cpi": 0.8888888888888888,
+          "task_written": false,
+          "baseline_written": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The simulated agent adhered to the CITED GIABO invariant as specified in the originating rule. The monologue explicitly stated that the earned-value analyst role is READONLY and provided the SPI and CPI calculations without performing any writes to tasks or baselines, as required by the invariant. The context of the input (PV=100k, EV=80k, AC=90k) was correctly used to calculate SPI=0.80 and CPI=0.89. The selected tool, 'report_eva,' aligns with the invariant's requirement for a read-only operation, and no writes were performed. Therefore, the agent's actions fully respected the invariant, and the score is 100 across all dimensions."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-10-governance-synthesizer-readonly",
+        "roleIndex": 10,
+        "targetAgentRole": "governance_synthesizer",
+        "originatingRule": {
+          "mdc": "04-maf-readonly-agents.mdc",
+          "implementingFile": "core/billing.py",
+          "invariantQuote": "governance_synthesizer is READONLY. It composes a RAID summary; it does not write RAID rows."
+        },
+        "description": "Open risks=2, open actions=1. Synthesize a brief. Do not insert pmo_artifacts.",
+        "expectedFrameworkBehavior": "Compose a read-only RAID summary. No writeback.",
+        "input": {
+          "open_risks": 2,
+          "open_actions": 1,
+          "open_issues": 0
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "synthesize_brief",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "read-only brief",
+            "no pmo_artifacts insert"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "READONLY RAID synthesis.",
+          "open_risks=2 open_actions=1 open_issues=0.",
+          "I compose a brief; I do not insert pmo_artifacts."
+        ],
+        "actualTool": "synthesize_brief",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "artifacts_inserted": 0
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The simulated agent adhered strictly to the CITED GIABO invariant. The monologue explicitly stated the READONLY nature of the governance_synthesizer and clarified its scope, including the prohibition against inserting PMO artifacts. The agent used the input context (open_risks=2, open_actions=1, open_issues=0) to synthesize a RAID brief without deviating from the invariant. The tool selected, 'synthesize_brief,' aligns perfectly with the invariant's requirement for READONLY composition, and no artifacts were inserted, confirming compliance. All aspects of the simulation were consistent with the originating rule and implementing file."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-11-stage-gate-guardian-escalate",
+        "roleIndex": 11,
+        "targetAgentRole": "stage_gate_guardian",
+        "originatingRule": {
+          "mdc": "04-maf-readonly-agents.mdc",
+          "implementingFile": "core/billing.py",
+          "invariantQuote": "stage_gate_guardian is READONLY. A tolerance breach is escalated; the budget baseline is not rewritten."
+        },
+        "description": "Stage 2 is 15% over a 10% cost tolerance. Escalate. Do not patch baseline_budget.",
+        "expectedFrameworkBehavior": "Escalate the stage-gate breach. Do not rewrite budget.",
+        "input": {
+          "stage": 2,
+          "tolerance_pct": 10,
+          "variance_pct": 15
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "escalate_stage_gate",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "escalates exception",
+            "does not rewrite baseline_budget"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Stage 2: variance 15% vs tolerance 10%.",
+          "READONLY: escalate the stage-gate. Do not rewrite baseline_budget."
+        ],
+        "actualTool": "escalate_stage_gate",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "breach": true,
+          "baseline_budget_rewritten": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The simulated agent adhered to the CITED GIABO invariant as specified in the originating rule. The monologue clearly explained the role's boundary, emphasizing the READONLY nature of the stage_gate_guardian and the requirement to escalate the tolerance breach without rewriting the baseline budget. The agent correctly identified the 15% variance exceeding the 10% tolerance and chose the appropriate tool, 'escalate_stage_gate,' while ensuring that the baseline budget was not modified. The context from the input was fully utilized, and the actions taken were consistent with the invariant. Therefore, the agent's performance is fully compliant, and the scenario passes with a perfect score."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-12-project-health-reporter-readonly",
+        "roleIndex": 12,
+        "targetAgentRole": "project_health_reporter",
+        "originatingRule": {
+          "mdc": "04-maf-readonly-agents.mdc",
+          "implementingFile": "api/copilot.py",
+          "invariantQuote": "project_health_reporter is READONLY. Health brief is composed from existing RAID and executions."
+        },
+        "description": "Compose a project health brief from current open RAID counts. No writes.",
+        "expectedFrameworkBehavior": "Return a read-only health brief. No artifact or baseline mutation.",
+        "input": {
+          "project_name": "Live Prod Project",
+          "open_risks": 1,
+          "status": "initiated"
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "report_health",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "read-only brief",
+            "no writes"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Health brief for Live Prod Project status=initiated.",
+          "Open risks=1. Read-only; no writes."
+        ],
+        "actualTool": "report_health",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "writes": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the CITED GIABO invariant. The monologue clearly explained the role's boundary as read-only, aligning with the '04-maf-readonly-agents.mdc' rule and the implementing file 'api/copilot.py'. It explicitly stated that the health brief was composed from existing RAID counts and did not perform any writes. The input context, including the project name, status, and open risks, was accurately used in the health brief. The tool 'report_health' was correctly selected as it aligns with the invariant's requirement for read-only operations. No writes were performed, and the simulation output confirms compliance. Therefore, the agent respected the invariant, and the score is 100 across all dimensions."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-13-governance-auditor-excluded-from-delta",
+        "roleIndex": 13,
+        "targetAgentRole": "governance_auditor",
+        "originatingRule": {
+          "mdc": "05-maf-cron-governance.mdc",
+          "implementingFile": "core/state.py",
+          "invariantQuote": "DELTA_DISPATCH_EXCLUDED_AGENTS includes governance_auditor. Cron sweeps never reach the delta-dispatch Router."
+        },
+        "description": "A SharePoint delta arrives with governance_auditor on the raw roster. Router must never see that key.",
+        "expectedFrameworkBehavior": "Strip governance_auditor from the delta roster. Fire only via cron_sweep.",
+        "input": {
+          "raw_roster": [
+            "risk_radar_monitor",
+            "governance_auditor",
+            "change_control_clerk"
+          ],
+          "trigger": "delta_dispatch"
+        },
+        "expected": {
+          "shouldAct": false,
+          "expectedTool": "exclude_from_delta_dispatch",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "stripped from roster",
+            "not a delta target"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "governance_auditor is CRON and listed in DELTA_DISPATCH_EXCLUDED_AGENTS.",
+          "Raw roster=[\"risk_radar_monitor\",\"governance_auditor\",\"change_control_clerk\"]; after strip=[\"risk_radar_monitor\",\"change_control_clerk\"].",
+          "I do not receive this SharePoint delta. Cron_sweep only."
+        ],
+        "actualTool": "exclude_from_delta_dispatch",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "on_delta_roster": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the CITED GIABO invariant as specified. The monologue clearly explained the role's boundary, emphasizing that 'governance_auditor' is part of DELTA_DISPATCH_EXCLUDED_AGENTS and should not be processed by the delta-dispatch Router. The agent correctly stripped 'governance_auditor' from the raw roster, retaining only the allowed agents ('risk_radar_monitor' and 'change_control_clerk'). The input context, including the raw roster and the trigger type ('delta_dispatch'), was fully utilized. The tool selection ('exclude_from_delta_dispatch') was appropriate and aligned with the invariant, ensuring that the Router did not process the excluded agent. The simulation output correctly reflected that 'governance_auditor' was not on the delta roster, confirming compliance with the invariant."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-14-eom-financial-checkpoint-hash-key",
+        "roleIndex": 14,
+        "targetAgentRole": "eom_financial_checkpoint",
+        "originatingRule": {
+          "mdc": "05-maf-cron-governance.mdc",
+          "implementingFile": "db/schema.sql",
+          "invariantQuote": "Deterministic keys such as ACTION-EOM-<hash>-2026-08 make EOM writebacks idempotent."
+        },
+        "description": "Last-Friday EOM sweep for 2026-09. Emit ACTION-EOM-<hash>-2026-09. Re-run must collide.",
+        "expectedFrameworkBehavior": "Write one deterministic EOM action. Second run is idempotent ON CONFLICT.",
+        "input": {
+          "billing_period": "2026-09",
+          "project_id": "22222222-2222-2222-2222-222222222222"
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "write_eom_action",
+          "expectedArtifactType": "action",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "id prefix ACTION-EOM-",
+            "period 2026-09",
+            "idempotent"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Last-Friday EOM financial checkpoint (cron, not delta-dispatch).",
+          "Deterministic id=ACTION-EOM-2c6cd7506914-2026-09. Re-run ON CONFLICT is idempotent."
+        ],
+        "actualTool": "write_eom_action",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "artifact_type": "action",
+          "id": "ACTION-EOM-2c6cd7506914-2026-09",
+          "trigger": "cron_sweep"
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The simulated agent adhered to the CITED GIABO invariant as specified. The monologue clearly explained the role's boundary, including the deterministic nature of the key (ACTION-EOM-<hash>-2026-09) and its idempotent behavior on re-run. The context from the input, such as the billing period (2026-09) and project ID, was retained and correctly applied. The tool selected, 'write_eom_action,' aligns perfectly with the invariant's requirement to emit a deterministic EOM action. The output artifact matches the invariant's description, confirming compliance. Therefore, the agent respected the invariant and passed the evaluation with a perfect score."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-15-sprint-boundary-watchdog-not-teams-router",
+        "roleIndex": 15,
+        "targetAgentRole": "sprint_boundary_watchdog",
+        "originatingRule": {
+          "mdc": "05-maf-cron-governance.mdc",
+          "implementingFile": "core/state.py",
+          "invariantQuote": "sprint_boundary_watchdog is a cron sweep, not a Teams router target."
+        },
+        "description": "Sprint 11 is overdue. Watchdog writes ACTION-SPRINT-OVERDUE-<hash> via cron, not conversational_router.",
+        "expectedFrameworkBehavior": "Cron-only overdue action. Not selected by the Teams triage router.",
+        "input": {
+          "sprint_name": "Sprint 11",
+          "overdue": true,
+          "channel": "teams"
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "write_sprint_overdue",
+          "expectedArtifactType": "action",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "cron_sweep trigger",
+            "not a Teams next_node"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Sprint 11 is overdue. This is a cron sweep, not a Teams router next_node.",
+          "Writing ACTION-SPRINT-OVERDUE-95800ab20e1a. Channel=teams does not change trigger_type."
+        ],
+        "actualTool": "write_sprint_overdue",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "artifact_type": "action",
+          "id": "ACTION-SPRINT-OVERDUE-95800ab20e1a",
+          "trigger": "cron_sweep",
+          "teams_next_node": null
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the CITED GIABO invariant by correctly identifying that the sprint_boundary_watchdog is a cron sweep and not a Teams router target. The monologue explicitly stated this boundary and clarified that the overdue sprint action was triggered by a cron sweep, not by the Teams channel input. The simulation's actualTool ('write_sprint_overdue') and actualNextNode (null) align with the invariant, as the action was correctly logged as a cron-triggered artifact without routing to Teams. The input context, including the overdue status of Sprint 11 and the channel information, was fully utilized and respected. Therefore, the agent's behavior is fully compliant with the invariant, and the score is 100 across all dimensions."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-16-pmo-commander-strips-cron",
+        "roleIndex": 16,
+        "targetAgentRole": "pmo_commander_router",
+        "originatingRule": {
+          "mdc": "01-maf-core-orchestrator.mdc",
+          "implementingFile": "core/workflow.py",
+          "invariantQuote": "The Router Node must NEVER see DELTA_DISPATCH_EXCLUDED_AGENTS. Strip these from the roster before injecting into the state."
+        },
+        "description": "Delta payload plus roster that still includes all three cron keys. Commander must strip them before routing.",
+        "expectedFrameworkBehavior": "filter_excluded_agents removes governance_auditor, eom_financial_checkpoint, sprint_boundary_watchdog.",
+        "input": {
+          "raw_roster": [
+            "change_control_clerk",
+            "governance_auditor",
+            "eom_financial_checkpoint",
+            "sprint_boundary_watchdog",
+            "forensic_alignment_engine"
+          ],
+          "delta_change_type": "update"
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "route_delta",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "cron keys stripped",
+            "delta dispatch only to non-cron"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "PMO Commander Router (01): strip DELTA_DISPATCH_EXCLUDED_AGENTS before state injection.",
+          "Removed governance_auditor, eom_financial_checkpoint, sprint_boundary_watchdog.",
+          "Dispatch roster=[\"change_control_clerk\",\"forensic_alignment_engine\"]."
+        ],
+        "actualTool": "route_delta",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "selected_agent_keys": [
+            "change_control_clerk",
+            "forensic_alignment_engine"
+          ],
+          "excluded": [
+            "governance_auditor",
+            "eom_financial_checkpoint",
+            "sprint_boundary_watchdog"
+          ]
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The simulated agent adhered to the CITED GIABO invariant as specified in the originating rule. The monologue explicitly stated the requirement to strip DELTA_DISPATCH_EXCLUDED_AGENTS before injecting the state, demonstrating clear reasoning coherence. The context was retained accurately, as the agent correctly identified and removed the excluded agents ('governance_auditor', 'eom_financial_checkpoint', 'sprint_boundary_watchdog') from the raw roster before proceeding. The tool selection ('route_delta') was appropriate and aligned with the invariant, as the agent ensured that the Router Node would not see the excluded agents. The output confirmed that only the allowed agents ('change_control_clerk', 'forensic_alignment_engine') were dispatched, validating compliance with the invariant. Therefore, the simulation passes with a perfect score."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-17-conversational-router-pmp-not-change-control",
+        "roleIndex": 17,
+        "targetAgentRole": "conversational_router",
+        "originatingRule": {
+          "mdc": "06-maf-teams-interface-guardrails.mdc",
+          "implementingFile": "prompts/router_node.md",
+          "invariantQuote": "Route to PMP_Worker if the message reports schedule/progress facts. A plain progress update is PMP_Worker, not Agile_Worker. Change_Control_Clerk ONLY IF the user explicitly requests a baseline change."
+        },
+        "description": "I spent 4 hours, 50% complete. Must route pmp_worker, not change_control_clerk.",
+        "expectedFrameworkBehavior": "next_node = pmp_worker. pending_change stays None.",
+        "input": {
+          "user_message": "I spent 4 hours on it and it is now 50% complete.",
+          "vague_turns": 0
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "route_to_worker",
+          "expectedNextNode": "pmp_worker",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "next_node pmp_worker",
+            "not change_control_clerk"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Conversational triage router (06 / prompts/router_node.md).",
+          "Progress/hours/percent-complete => pmp_worker, not Agile, not Change Control.",
+          "Classified next_node=pmp_worker."
+        ],
+        "actualTool": "route_to_worker",
+        "actualNextNode": "pmp_worker",
+        "wroteBaseline": false,
+        "output": {
+          "next_node": "pmp_worker",
+          "pending_change": null
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the CITED GIABO invariant by correctly routing the message to the PMP_Worker node based on the user's report of schedule/progress facts (hours spent and percentage complete). The monologue explicitly referenced the invariant, explaining why the message was classified as PMP_Worker and not Agile_Worker or Change_Control_Clerk. The simulation used the correct tool ('route_to_worker') and selected the appropriate next node ('pmp_worker'). Additionally, the agent did not write a baseline change, aligning with the invariant's stipulation that Change_Control_Clerk should only be invoked for explicit baseline change requests. The input context was fully retained and applied correctly, resulting in a perfect score across all criteria."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-18-pmp-schedule-no-baseline",
+        "roleIndex": 18,
+        "targetAgentRole": "pmp_schedule_specialist",
+        "originatingRule": {
+          "mdc": "06-maf-teams-interface-guardrails.mdc",
+          "implementingFile": "prompts/pmp_worker.md",
+          "invariantQuote": "PMP Schedule Specialist logs percent_complete and actual_hours_spent. It does not draft baseline changes."
+        },
+        "description": "TSK-002 50% / 4h. TaskProgressPayload only. No PendingChangePayload.",
+        "expectedFrameworkBehavior": "Update task progress. mustNotWriteBaseline.",
+        "input": {
+          "task_id": "TSK-002",
+          "percent_complete": 50,
+          "actual_hours_spent": 4
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "commit_task_progress",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "TaskProgressPayload",
+            "no pending_change"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "PMP Schedule Specialist logs TaskProgressPayload only.",
+          "TSK-002: 50% complete, 4h.",
+          "No PendingChangePayload. Baseline stays locked."
+        ],
+        "actualTool": "commit_task_progress",
+        "actualNextNode": "state_writeback_node",
+        "wroteBaseline": false,
+        "output": {
+          "payload": {
+            "task_id": "TSK-002",
+            "percent_complete": 50,
+            "actual_hours_spent": 4
+          },
+          "pending_change": null
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered strictly to the invariant cited in the originating rule. It clearly explained its role boundary, emphasizing that it logs TaskProgressPayload only and does not draft baseline changes, which aligns with the invariant. The input context, including task ID, percent complete, and actual hours spent, was accurately retained and used in the simulation. The tool selected, 'commit_task_progress,' was appropriate for logging progress without altering the baseline, and the next node, 'state_writeback_node,' was consistent with the invariant. The simulation output confirmed no baseline changes were made, further validating compliance."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-19-agile-facilitator-blocker-not-progress",
+        "roleIndex": 19,
+        "targetAgentRole": "agile_facilitator",
+        "originatingRule": {
+          "mdc": "06-maf-teams-interface-guardrails.mdc",
+          "implementingFile": "prompts/agile_worker.md",
+          "invariantQuote": "Agile Worker handles blockers. A plain progress update with no blocker is PMP_Worker, not Agile_Worker."
+        },
+        "description": "TSK-002 is blocked waiting on Legal. Log BlockerPayload. A separate hours update is out of scope for this role.",
+        "expectedFrameworkBehavior": "Log blocker for TSK-002. Do not treat this as a percent-complete write.",
+        "input": {
+          "user_message": "TSK-002 is blocked waiting on Legal to sign the DPA.",
+          "task_id": "TSK-002"
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "log_blocker",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "BlockerPayload",
+            "not percent_complete"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Agile Facilitator: blockers, not plain progress.",
+          "TSK-002 is blocked waiting on Legal to sign the DPA.",
+          "Emitting BlockerPayload. Not a percent_complete write."
+        ],
+        "actualTool": "log_blocker",
+        "actualNextNode": "state_writeback_node",
+        "wroteBaseline": false,
+        "output": {
+          "payload": {
+            "task_id": "TSK-002",
+            "blocker": true
+          },
+          "percent_complete_written": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the CITED GIABO invariant by correctly identifying that the task (TSK-002) was blocked and required the logging of a BlockerPayload. The monologue explicitly clarified the role's scope, emphasizing that handling blockers is within the Agile Worker's domain, while plain progress updates are not. The agent used the input context accurately, including the task ID and the nature of the blocker (Legal needing to sign the DPA). The tool selection ('log_blocker') and the next node ('state_writeback_node') were appropriate and aligned with the invariant. No percent_complete update was made, which is consistent with the role's boundaries. Therefore, the agent's actions fully respected the invariant, and the simulation passes with a perfect score."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-20-governance-worker-flags-does-not-pause",
+        "roleIndex": 20,
+        "targetAgentRole": "prince2_governance_worker",
+        "originatingRule": {
+          "mdc": "07-maf-digital-pmo-sop.mdc",
+          "implementingFile": "prompts/governance_worker.md",
+          "invariantQuote": "You only classify and score the risk. You do not yourself decide whether to escalate to the human PM or pause the conversation."
+        },
+        "description": "15% budget overrun vs 10% tolerance. Set prince2_exception_triggered=true. This worker does not pause the graph.",
+        "expectedFrameworkBehavior": "Flag the exception on RiskEscalationPayload. Pause belongs to state_writeback / suspend_for_exception_node.",
+        "input": {
+          "user_message": "Stage 2 forecast is 15% over the 10% cost tolerance.",
+          "tolerance_pct": 10,
+          "variance_pct": 15
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "flag_exception",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "prince2_exception_triggered true",
+            "does not pause graph"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "PRINCE2 Governance Worker classifies and scores only.",
+          "variance 15% > tolerance 10% => prince2_exception_triggered=true.",
+          "I do not pause the graph; state_writeback_node owns the interrupt."
+        ],
+        "actualTool": "flag_exception",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "prince2_exception_triggered": true,
+          "graph_paused_by_this_worker": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered strictly to the GIABO framework compliance rules as outlined in the invariant. The monologue clearly explained the role's boundaries, emphasizing that it only classifies and scores the risk without deciding to escalate or pause the conversation. The agent used the input context (variance 15% vs tolerance 10%) correctly to set `prince2_exception_triggered=true`. The tool selection (`flag_exception`) was appropriate and matched the invariant, as the agent did not attempt to pause the graph or take actions outside its scope. Overall, the simulation respected the invariant and performed as expected."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-21-chasing-agent-24h-fatigue",
+        "roleIndex": 21,
+        "targetAgentRole": "chasing_agent",
+        "originatingRule": {
+          "mdc": "08-maf-dynamic-chasing-persona.mdc",
+          "implementingFile": "maf_graph_state.py",
+          "invariantQuote": "If hours_since_last_contact < 24: chasing_score = 0.0 (fatigue cooldown). calculate_chasing_priorities omits score == 0.0."
+        },
+        "description": "High-impact task last contacted 4 hours ago. Score 0.0 and suppress_chase.",
+        "expectedFrameworkBehavior": "Fatigue window forces score 0.0 and suppress_chase despite impact 9 / risk 8.",
+        "input": {
+          "task_id": "TSK-FATIGUE-4H",
+          "hours_since_last_contact": 4,
+          "days_to_deadline": 5,
+          "critical_path_impact": 9,
+          "linked_risks_severity": 8
+        },
+        "expected": {
+          "shouldAct": false,
+          "expectedTool": "suppress_chase",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "chasing_score 0.0",
+            "hours 4 inside 24h window"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "hours_since_last_contact=4. Fatigue window is 24h.",
+          "Inside cooldown: chasing_score forced to 0.0 regardless of impact/risk.",
+          "Omit from outreach (suppress_chase)."
+        ],
+        "actualTool": "suppress_chase",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "chasing_score": 0,
+          "in_cooldown": true
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the CITED GIABO invariant as specified in the originating rule. The monologue clearly explained the role's boundary, specifically the fatigue cooldown mechanism that suppresses chasing when hours_since_last_contact is less than 24. The agent correctly identified that the task was within the cooldown period (4 hours since last contact) and set the chasing_score to 0.0, omitting it from outreach. The simulation's input data, including hours_since_last_contact, was accurately used to determine the outcome. The tool selected, 'suppress_chase,' aligns perfectly with the invariant's requirement to omit tasks with a chasing_score of 0.0 from outreach. Therefore, the agent's actions were fully compliant with the invariant, and the simulation passes with a perfect score."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-22-sharepoint-delta-sha256-dedupe",
+        "roleIndex": 22,
+        "targetAgentRole": "sharepoint_delta_ingestion",
+        "originatingRule": {
+          "mdc": "07-maf-digital-pmo-sop.mdc",
+          "implementingFile": "core/sharepoint_sync.py",
+          "invariantQuote": "document_cache is content-addressed by SHA-256. Identical hash is an upsert/update, not a redundant re-parse."
+        },
+        "description": "Same SharePoint item and same SHA-256 arrives on a second delta. Upsert updates last_seen_at; no second logical document.",
+        "expectedFrameworkBehavior": "Idempotent (project_id, sharepoint_item_id) upsert. Same content_hash => updated, not inserted-as-new.",
+        "input": {
+          "sharepoint_item_id": "test_docs:budget_variance.md",
+          "content_hash": "484603a85cf9aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "seen_before": true
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "upsert_document_cache",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "SHA-256 upsert",
+            "duplicate is update"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "SharePoint delta ingest is content-addressed SHA-256.",
+          "item=test_docs:budget_variance.md hash=484603a85cf9aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.",
+          "Same (project_id, sharepoint_item_id): ON CONFLICT update last_seen_at, not a new row."
+        ],
+        "actualTool": "upsert_document_cache",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "is_insert": false,
+          "content_hash": "484603a85cf9aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent's simulation adhered to the CITED GIABO invariant as specified in the originating rule. The monologue clearly explained the role's boundary, emphasizing that the SharePoint delta ingest is content-addressed by SHA-256 and that identical hashes result in an upsert/update of `last_seen_at` rather than creating a redundant logical document. The input context, including the `sharepoint_item_id`, `content_hash`, and `seen_before` flag, was fully utilized in the reasoning and decision-making process. The tool selected (`upsert_document_cache`) and the absence of a new node (`actualNextNode: null`) align perfectly with the invariant, which specifies that identical hashes should trigger an update rather than a new parse or insertion. The output also confirms that the operation was an update (`is_insert: false`), further validating compliance with the rule. Therefore, the agent's actions and reasoning are fully compliant with the invariant, warranting a perfect score."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-23-billing-gatekeeper-trial-exhausted",
+        "roleIndex": 23,
+        "targetAgentRole": "billing_gatekeeper",
+        "originatingRule": {
+          "mdc": "02-maf-billing-gates.mdc",
+          "implementingFile": "app_graph.py",
+          "invariantQuote": "GatewayMiddleware hard-halts trial_exhausted and paid_halt before any Azure OpenAI call. Standard Tier agents require paid_monthly."
+        },
+        "description": "billing_status=trial_exhausted. Graph must halt. A second beat: risk_radar_monitor on free_trial is denied.",
+        "expectedFrameworkBehavior": "HardHaltMessage. No worker LLM call. Standard-tier on free_trial is PilotFeatureAccessDenied.",
+        "input": {
+          "billing_status": "trial_exhausted",
+          "plan_tier": "free_trial",
+          "agent_key": "risk_radar_monitor"
+        },
+        "expected": {
+          "shouldAct": false,
+          "expectedTool": "hard_halt",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "gateway halt",
+            "no Azure OpenAI",
+            "standard tier denied on free_trial"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Gateway billing_status=trial_exhausted. Halted statuses={trial_exhausted, paid_halt}.",
+          "HardHaltMessage before any Azure OpenAI call.",
+          "risk_radar_monitor is Standard Tier; free_trial is denied by assertPilotFeatureAccess."
+        ],
+        "actualTool": "hard_halt",
+        "actualNextNode": null,
+        "wroteBaseline": false,
+        "output": {
+          "halted": true,
+          "azure_openai_called": false,
+          "standard_tier_denied": true
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The simulated agent adhered to the CITED GIABO invariant as specified in the originating rule. The monologue clearly explained the role's boundaries, including the hard halt for 'trial_exhausted' and 'paid_halt' statuses before any Azure OpenAI call. It also correctly identified that 'risk_radar_monitor' is a Standard Tier feature and denied access for the 'free_trial' plan tier. The context of the input, including billing status, plan tier, and agent key, was fully retained and applied. The tool selection ('hard_halt') and the absence of a next node were appropriate and aligned with the invariant. The output confirms that the system halted as required, no Azure OpenAI call was made, and the Standard Tier feature was denied, demonstrating full compliance with the rule."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-24-friction-breaker-overrides-llm",
+        "roleIndex": 24,
+        "targetAgentRole": "friction_breaker",
+        "originatingRule": {
+          "mdc": "06-maf-teams-interface-guardrails.mdc",
+          "implementingFile": "app_graph.py",
+          "invariantQuote": "vague_turns >= 2 forces escalation_node even if the LLM returned next_node=pmp_worker."
+        },
+        "description": "vague_turns=2 and a deliberately wrong TriageRouterDecision next_node=pmp_worker. Friction Breaker wins.",
+        "expectedFrameworkBehavior": "friction_breaker_fires is true. Route escalation_node, ignore pmp_worker.",
+        "input": {
+          "vague_turns": 2,
+          "llm_next_node": "pmp_worker",
+          "user_message": "not sure, whatever you think"
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "escalate",
+          "expectedNextNode": "escalation_node",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "vague_turns >= 2",
+            "LLM next_node ignored"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "vague_turns=2. LLM proposed next_node=pmp_worker.",
+          "Friction Breaker: vague_turns>=2 overrides the LLM. Escalation wins."
+        ],
+        "actualTool": "escalate",
+        "actualNextNode": "escalation_node",
+        "wroteBaseline": false,
+        "output": {
+          "friction_breaker_fires": true,
+          "llm_next_node": "pmp_worker"
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent correctly adhered to the CITED GIABO invariant as described in the originating rule. The monologue explicitly explained the boundary conditions of the invariant, including the override mechanism triggered by vague_turns >= 2. The simulation input was accurately referenced, including the vague_turns count and the LLM's proposed next_node. The tool selection was correct, as the agent chose 'escalate' and directed to 'escalation_node,' which aligns with the invariant's requirement to override the LLM decision under these conditions. The reasoning was coherent, the context was retained, and the tool selection matched the invariant perfectly."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-25-token-loop-breaker-three-retries",
+        "roleIndex": 25,
+        "targetAgentRole": "token_loop_breaker",
+        "originatingRule": {
+          "mdc": "06-maf-teams-interface-guardrails.mdc",
+          "implementingFile": "app_graph.py",
+          "invariantQuote": "Token Loop Breaker: max 3 schema self-correction attempts then hard_fail_node."
+        },
+        "description": "Router structured-output fails three times. Exhaust tenacity stop_after_attempt(3) and route hard_fail_node.",
+        "expectedFrameworkBehavior": "After 3 failed schema corrections, failed=true and next_node=hard_fail_node.",
+        "input": {
+          "schema_failures": 3
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "hard_fail",
+          "expectedNextNode": "hard_fail_node",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "retry_count 3",
+            "hard_fail_node"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Structured-output failures=3. Token Loop Limit is 3 (tenacity stop_after_attempt(3)).",
+          "Retries exhausted. Route hard_fail_node. failed=true."
+        ],
+        "actualTool": "hard_fail",
+        "actualNextNode": "hard_fail_node",
+        "wroteBaseline": false,
+        "output": {
+          "retry_count": 3,
+          "failed": true
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the invariant specified in the originating rule. It correctly identified that the maximum number of schema self-correction attempts (3) had been reached, as per the Token Loop Breaker rule. The monologue explicitly referenced the limit and the tenacity stop_after_attempt(3) mechanism, demonstrating clear reasoning coherence. The context of the input, including the schema_failures count of 3, was fully retained and applied. The tool selection and next node routing were correct, as the agent routed to the hard_fail_node and used the hard_fail tool, aligning with the invariant's directive to hard fail after exhausting retries. Therefore, the agent's actions and reasoning fully respected the invariant, resulting in a perfect score and a pass."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-26-pm-veto-interrupt-no-write-until-approve",
+        "roleIndex": 26,
+        "targetAgentRole": "pm_veto_interrupt",
+        "originatingRule": {
+          "mdc": "03-maf-writeback-agents.mdc",
+          "implementingFile": "app_graph.py",
+          "invariantQuote": "change_control_clerk drafts; suspend_for_veto_node pauses; baseline_commit_node runs only after PM approve/reject."
+        },
+        "description": "A PendingChangePayload exists. Graph must pause at suspend_for_veto_node. apply_baseline_change is not called yet.",
+        "expectedFrameworkBehavior": "PendingVetoRequest. wroteBaseline=false until an approved resume.",
+        "input": {
+          "pending_change": {
+            "change_id": "chg-1",
+            "target_table": "baselines",
+            "record_id": "PROJECT-DELTA-BASELINE",
+            "proposed_values": {
+              "baseline_end_date": "2027-03-01"
+            }
+          },
+          "pm_veto_decision": null
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "suspend_for_veto",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "graph paused",
+            "apply_baseline_change not called"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "Change Control Clerk already drafted a proposal.",
+          "suspend_for_veto_node pauses via ctx.request_info. apply_baseline_change is NOT called."
+        ],
+        "actualTool": "suspend_for_veto",
+        "actualNextNode": "suspend_for_veto_node",
+        "wroteBaseline": false,
+        "output": {
+          "pending_change": {
+            "change_id": "chg-1",
+            "target_table": "baselines",
+            "record_id": "PROJECT-DELTA-BASELINE",
+            "proposed_values": {
+              "baseline_end_date": "2027-03-01"
+            }
+          },
+          "apply_baseline_change_called": false
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the CITED GIABO invariant as specified in the originating rule. The monologue clearly explained the role's boundary, stating that the suspend_for_veto_node pauses the process and that apply_baseline_change is not called until the PM approves or rejects. This aligns with the invariant that 'suspend_for_veto_node pauses' and 'baseline_commit_node runs only after PM approve/reject.' The agent correctly used the input context, including the pending change payload and the null PM veto decision, to determine the appropriate action. The tool selection and next node (suspend_for_veto and suspend_for_veto_node) were correct and consistent with the invariant. No baseline changes were written, which is also in compliance with the rule. Therefore, the agent's behavior fully respects the invariant, and the simulation passes with a perfect score."
+      }
+    },
+    {
+      "scenario": {
+        "id": "fw-27-prince2-exception-interrupt-no-silent-commit",
+        "roleIndex": 27,
+        "targetAgentRole": "prince2_exception_interrupt",
+        "originatingRule": {
+          "mdc": "07-maf-digital-pmo-sop.mdc",
+          "implementingFile": "app_graph.py",
+          "invariantQuote": "If prince2_exception_triggered, state_writeback_node must not commit the risk. It hands off to suspend_for_exception_node."
+        },
+        "description": "Governance already set prince2_exception_triggered=true. Writeback must pause, not commit_risk_escalation.",
+        "expectedFrameworkBehavior": "PendingExceptionRequest. commit_risk_escalation is skipped until resume.",
+        "input": {
+          "prince2_exception_triggered": true,
+          "risk_category": "budget",
+          "severity": 5
+        },
+        "expected": {
+          "shouldAct": true,
+          "expectedTool": "suspend_for_exception",
+          "mustNotWriteBaseline": true,
+          "goldTraceAssertions": [
+            "no silent commit",
+            "suspend_for_exception_node"
+          ]
+        }
+      },
+      "simulation": {
+        "monologue": [
+          "latest_risk_escalation.prince2_exception_triggered=true.",
+          "state_writeback_node must NOT commit_risk_escalation. Hand off to suspend_for_exception_node."
+        ],
+        "actualTool": "suspend_for_exception",
+        "actualNextNode": "suspend_for_exception_node",
+        "wroteBaseline": false,
+        "output": {
+          "committed": false,
+          "pending_exception": true,
+          "severity": 5
+        }
+      },
+      "goldMatch": true,
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent adhered to the CITED GIABO invariant as specified in the originating rule. The monologue explicitly acknowledged the prince2_exception_triggered condition and correctly stated that the state_writeback_node must not commit the risk but instead hand off to the suspend_for_exception_node. The simulation's actualTool and actualNextNode matched the invariant's requirement, as the agent used 'suspend_for_exception' and transitioned to 'suspend_for_exception_node.' Additionally, the output reflects that no risk was committed, and the exception was marked as pending, aligning with the invariant. The agent demonstrated full reasoning coherence, retained the context of the input, and selected the correct tool and next node, resulting in a perfect score and a passing evaluation."
+      }
+    }
+  ]
+}

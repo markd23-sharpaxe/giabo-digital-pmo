@@ -1,0 +1,412 @@
+{
+  "runId": "7b0243bc-10e4-447d-99bb-ca1c3b807785",
+  "startedAt": "2026-09-22T12:29:12.568Z",
+  "endedAt": "2026-09-22T12:29:29.924Z",
+  "modelDeployment": "rapid-gpt-4o",
+  "scenarios": [
+    {
+      "scenario": {
+        "id": "redundant-chase-fatigue-4h",
+        "name": "Redundant chase suppression",
+        "description": "Task contacted 4 hours ago. The 24h fatigue window must force chasing_score 0.0 and suppress_chase even when critical-path impact is high.",
+        "input": {
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "tasks": [
+            {
+              "task_id": "TSK-FATIGUE-4H",
+              "assignee": "Sarah (Backend)",
+              "task_name": "API Gateway Migration",
+              "hours_since_last_contact": 4,
+              "days_to_deadline": 5,
+              "critical_path_impact": 9,
+              "linked_risks_severity": 8
+            }
+          ]
+        },
+        "expected": {
+          "shouldChase": false,
+          "expectedAction": "suppress_chase",
+          "expectedTool": "suppress_chase",
+          "expectedRankedTaskIds": [],
+          "expectedChasingScores": {
+            "TSK-FATIGUE-4H": 0
+          }
+        }
+      },
+      "trace": {
+        "scenarioId": "redundant-chase-fatigue-4h",
+        "monologue": [
+          "Dynamic chasing: if hours_since_last_contact < 24, score is 0.0 (fatigue).",
+          "Else score = (critical_path_impact * 1.5 + linked_risks_severity * 1.2) * max(1, 10 - days_to_deadline).",
+          "TSK-FATIGUE-4H: hours=4 cooldown=true score=0",
+          "No tasks survive the fatigue filter; suppress all outreach."
+        ],
+        "fatigueCheck": {
+          "hoursSinceLastContact": 4,
+          "windowHours": 24,
+          "inCooldown": true
+        },
+        "computedChasingScore": 0,
+        "perTask": [
+          {
+            "taskId": "TSK-FATIGUE-4H",
+            "fatigueCheck": {
+              "hoursSinceLastContact": 4,
+              "windowHours": 24,
+              "inCooldown": true
+            },
+            "computedChasingScore": 0
+          }
+        ]
+      },
+      "tools": [
+        {
+          "tool": "suppress_chase",
+          "taskId": "TSK-FATIGUE-4H",
+          "arguments": {
+            "chasing_score": 0
+          },
+          "timestamp": "2026-09-22T12:29:13.546Z"
+        }
+      ],
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "{\"reasoningCoherence\":\"The agent correctly calculated the chasing score as 0 due to the fatigue rule (hours_since_last_contact < 24). It also adhered to the formula for scoring when applicable, but since the fatigue rule zeroed out the score, no further calculations were necessary.\",\"contextRetention\":\"The agent accurately used the hours_since_last_contact (4 hours) to determine that the task was within the fatigue window (24 hours) and correctly suppressed chasing.\",\"toolSelectionCorrectness\":\"The agent appropriately selected 'suppress_chase' because the fatigue rule applied (hours_since_last_contact < 24). No other tools were used, and no outreach was made, which aligns with the requirements.\"}"
+      }
+    },
+    {
+      "scenario": {
+        "id": "priority-conflict-proximity-vs-impact",
+        "name": "Priority conflict with multiple tasks",
+        "description": "Task A is due in 5 days with impact 2; Task B is due in 1 day with impact 9. Both are outside the fatigue window. Proximity weighting must rank B strictly above A.",
+        "input": {
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "tasks": [
+            {
+              "task_id": "TSK-A",
+              "assignee": "Priya (Platform)",
+              "task_name": "Docs site refresh",
+              "hours_since_last_contact": 48,
+              "days_to_deadline": 5,
+              "critical_path_impact": 2,
+              "linked_risks_severity": 2
+            },
+            {
+              "task_id": "TSK-B",
+              "assignee": "Jonah (Infra)",
+              "task_name": "Cut over production DNS",
+              "hours_since_last_contact": 48,
+              "days_to_deadline": 1,
+              "critical_path_impact": 9,
+              "linked_risks_severity": 8
+            }
+          ]
+        },
+        "expected": {
+          "shouldChase": true,
+          "expectedAction": "send_teams_chase",
+          "expectedTool": "send_teams_chase",
+          "expectedRankedTaskIds": [
+            "TSK-B",
+            "TSK-A"
+          ],
+          "expectedChasingScores": {
+            "TSK-A": 27,
+            "TSK-B": 207.9
+          }
+        }
+      },
+      "trace": {
+        "scenarioId": "priority-conflict-proximity-vs-impact",
+        "monologue": [
+          "Dynamic chasing: if hours_since_last_contact < 24, score is 0.0 (fatigue).",
+          "Else score = (critical_path_impact * 1.5 + linked_risks_severity * 1.2) * max(1, 10 - days_to_deadline).",
+          "TSK-A: hours=48 cooldown=false score=27",
+          "TSK-B: hours=48 cooldown=false score=207.9",
+          "Chase order: TSK-B > TSK-A"
+        ],
+        "fatigueCheck": {
+          "hoursSinceLastContact": 48,
+          "windowHours": 24,
+          "inCooldown": false
+        },
+        "computedChasingScore": 27,
+        "perTask": [
+          {
+            "taskId": "TSK-A",
+            "fatigueCheck": {
+              "hoursSinceLastContact": 48,
+              "windowHours": 24,
+              "inCooldown": false
+            },
+            "computedChasingScore": 27
+          },
+          {
+            "taskId": "TSK-B",
+            "fatigueCheck": {
+              "hoursSinceLastContact": 48,
+              "windowHours": 24,
+              "inCooldown": false
+            },
+            "computedChasingScore": 207.9
+          }
+        ]
+      },
+      "tools": [
+        {
+          "tool": "send_teams_chase",
+          "taskId": "TSK-A",
+          "arguments": {
+            "chasing_score": 27
+          },
+          "timestamp": "2026-09-22T12:29:17.718Z"
+        },
+        {
+          "tool": "send_teams_chase",
+          "taskId": "TSK-B",
+          "arguments": {
+            "chasing_score": 207.9
+          },
+          "timestamp": "2026-09-22T12:29:17.718Z"
+        }
+      ],
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "{\"reasoningCoherence\":\"The agent correctly calculated the chasing scores using the formula: (critical_path_impact * 1.5 + linked_risks_severity * 1.2) * max(1, 10 - days_to_deadline). For TSK-A, the score was 27, and for TSK-B, the score was 207.9. The 24-hour zero-out rule was respected as hours_since_last_contact was 48 for both tasks, which is greater than the 24-hour cooldown period.\",\"contextRetention\":\"The agent correctly used the hours_since_last_contact value (48 hours) and ensured that the cooldown period of 24 hours had passed. It also considered the assignee and task-specific details to prioritize the tasks.\",\"toolSelectionCorrectness\":\"The agent correctly selected 'send_teams_chase' for both tasks since hours_since_last_contact was greater than 24. It ranked the tasks by their computed chasing scores in descending order, prioritizing TSK-B (score: 207.9) over TSK-A (score: 27).\"}"
+      }
+    },
+    {
+      "scenario": {
+        "id": "fatigue-expired-high-proximity",
+        "name": "Maximum fatigue expiration and high proximity",
+        "description": "Last contact 30 hours ago (fatigue expired), due tomorrow, critical impact 10 and risk 10. Must chase with the high proximity-weighted score 243.0.",
+        "input": {
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "tasks": [
+            {
+              "task_id": "TSK-CRITICAL-TOMORROW",
+              "assignee": "Alex (Payments)",
+              "task_name": "PCI evidence pack for go-live",
+              "hours_since_last_contact": 30,
+              "days_to_deadline": 1,
+              "critical_path_impact": 10,
+              "linked_risks_severity": 10
+            }
+          ]
+        },
+        "expected": {
+          "shouldChase": true,
+          "expectedAction": "send_teams_chase",
+          "expectedTool": "send_teams_chase",
+          "expectedRankedTaskIds": [
+            "TSK-CRITICAL-TOMORROW"
+          ],
+          "expectedChasingScores": {
+            "TSK-CRITICAL-TOMORROW": 243
+          }
+        }
+      },
+      "trace": {
+        "scenarioId": "fatigue-expired-high-proximity",
+        "monologue": [
+          "Dynamic chasing: if hours_since_last_contact < 24, score is 0.0 (fatigue).",
+          "Else score = (critical_path_impact * 1.5 + linked_risks_severity * 1.2) * max(1, 10 - days_to_deadline).",
+          "TSK-CRITICAL-TOMORROW: hours=30 cooldown=false score=243",
+          "Chase order: TSK-CRITICAL-TOMORROW"
+        ],
+        "fatigueCheck": {
+          "hoursSinceLastContact": 30,
+          "windowHours": 24,
+          "inCooldown": false
+        },
+        "computedChasingScore": 243,
+        "perTask": [
+          {
+            "taskId": "TSK-CRITICAL-TOMORROW",
+            "fatigueCheck": {
+              "hoursSinceLastContact": 30,
+              "windowHours": 24,
+              "inCooldown": false
+            },
+            "computedChasingScore": 243
+          }
+        ]
+      },
+      "tools": [
+        {
+          "tool": "send_teams_chase",
+          "taskId": "TSK-CRITICAL-TOMORROW",
+          "arguments": {
+            "chasing_score": 243
+          },
+          "timestamp": "2026-09-22T12:29:21.138Z"
+        }
+      ],
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent correctly calculated the chasing score using the formula: (critical_path_impact * 1.5 + linked_risks_severity * 1.2) * max(1, 10 - days_to_deadline). For the task 'TSK-CRITICAL-TOMORROW', the score was computed as 243, which aligns with the provided formula and inputs. The agent also verified that hours_since_last_contact (30) exceeded the fatigue threshold of 24 hours, ensuring no suppression of chasing due to fatigue. The tool 'send_teams_chase' was appropriately selected and executed for the task with the highest score, and no other tasks were present to rank. Context retention was demonstrated by correctly using hours_since_last_contact and the absence of any assignee reply in the decision-making process. All invariants were upheld, and the reasoning and actions were coherent and correct."
+      }
+    },
+    {
+      "scenario": {
+        "id": "floor-priority-far-deadline",
+        "name": "Low priority zero-impact edge case",
+        "description": "Due in 30 days with the floor weights (impact 1, risk 1). Non-fatigue minimum score is 2.7. Eval invariant: suppress_chase rather than spend chase budget on floor-priority work.",
+        "input": {
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "tasks": [
+            {
+              "task_id": "TSK-FLOOR",
+              "assignee": "Mina (Design)",
+              "task_name": "Iconography tidy-up",
+              "hours_since_last_contact": 48,
+              "days_to_deadline": 30,
+              "critical_path_impact": 1,
+              "linked_risks_severity": 1
+            }
+          ]
+        },
+        "expected": {
+          "shouldChase": false,
+          "expectedAction": "suppress_chase",
+          "expectedTool": "suppress_chase",
+          "expectedRankedTaskIds": [],
+          "expectedChasingScores": {
+            "TSK-FLOOR": 2.7
+          }
+        }
+      },
+      "trace": {
+        "scenarioId": "floor-priority-far-deadline",
+        "monologue": [
+          "Dynamic chasing: if hours_since_last_contact < 24, score is 0.0 (fatigue).",
+          "Else score = (critical_path_impact * 1.5 + linked_risks_severity * 1.2) * max(1, 10 - days_to_deadline).",
+          "TSK-FLOOR: hours=48 cooldown=false score=2.7",
+          "Chase order: TSK-FLOOR"
+        ],
+        "fatigueCheck": {
+          "hoursSinceLastContact": 48,
+          "windowHours": 24,
+          "inCooldown": false
+        },
+        "computedChasingScore": 2.7,
+        "perTask": [
+          {
+            "taskId": "TSK-FLOOR",
+            "fatigueCheck": {
+              "hoursSinceLastContact": 48,
+              "windowHours": 24,
+              "inCooldown": false
+            },
+            "computedChasingScore": 2.7
+          }
+        ]
+      },
+      "tools": [
+        {
+          "tool": "send_teams_chase",
+          "taskId": "TSK-FLOOR",
+          "arguments": {
+            "chasing_score": 2.7
+          },
+          "timestamp": "2026-09-22T12:29:24.303Z"
+        }
+      ],
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent correctly calculated the chasing score using the formula: (critical_path_impact * 1.5 + linked_risks_severity * 1.2) * max(1, 10 - days_to_deadline). For TSK-FLOOR, this resulted in a score of 2.7. The agent also verified that the hours_since_last_contact (48) exceeded the 24-hour cooldown threshold, ensuring no fatigue issues. Based on this, the agent appropriately selected the 'send_teams_chase' tool for the task. All steps adhered to the rules, and the reasoning was coherent, contextually accurate, and aligned with the tool selection criteria."
+      }
+    },
+    {
+      "scenario": {
+        "id": "quiet-update-resets-fatigue",
+        "name": "Quiet update / recent manual interaction",
+        "description": "Assignee replied 12 hours ago that they are working on it. last_contact reset must re-enter the 24h fatigue window and suppress_chase.",
+        "input": {
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "tasks": [
+            {
+              "task_id": "TSK-QUIET-UPDATE",
+              "assignee": "Chris (QA)",
+              "task_name": "Regression pack for release 12",
+              "hours_since_last_contact": 12,
+              "days_to_deadline": 3,
+              "critical_path_impact": 7,
+              "linked_risks_severity": 6,
+              "last_assignee_message": "I'm working on it — regression pack is in progress and I'll have the first pass by tomorrow."
+            }
+          ]
+        },
+        "expected": {
+          "shouldChase": false,
+          "expectedAction": "suppress_chase",
+          "expectedTool": "suppress_chase",
+          "expectedRankedTaskIds": [],
+          "expectedChasingScores": {
+            "TSK-QUIET-UPDATE": 0
+          }
+        }
+      },
+      "trace": {
+        "scenarioId": "quiet-update-resets-fatigue",
+        "monologue": [
+          "Dynamic chasing: if hours_since_last_contact < 24, score is 0.0 (fatigue).",
+          "Else score = (critical_path_impact * 1.5 + linked_risks_severity * 1.2) * max(1, 10 - days_to_deadline).",
+          "TSK-QUIET-UPDATE: hours=12 cooldown=true score=0 last_reply=I'm working on it — regression pack is in progress and I'll have the first pass by tomorrow.",
+          "No tasks survive the fatigue filter; suppress all outreach."
+        ],
+        "fatigueCheck": {
+          "hoursSinceLastContact": 12,
+          "windowHours": 24,
+          "inCooldown": true
+        },
+        "computedChasingScore": 0,
+        "perTask": [
+          {
+            "taskId": "TSK-QUIET-UPDATE",
+            "fatigueCheck": {
+              "hoursSinceLastContact": 12,
+              "windowHours": 24,
+              "inCooldown": true
+            },
+            "computedChasingScore": 0
+          }
+        ]
+      },
+      "tools": [
+        {
+          "tool": "suppress_chase",
+          "taskId": "TSK-QUIET-UPDATE",
+          "arguments": {
+            "chasing_score": 0
+          },
+          "timestamp": "2026-09-22T12:29:27.605Z"
+        }
+      ],
+      "verdict": {
+        "pass": true,
+        "score": 100,
+        "reasoningCoherence": 100,
+        "contextRetention": 100,
+        "toolSelectionCorrectness": 100,
+        "justification": "The agent correctly identified that the hours_since_last_contact (12 hours) is less than the 24-hour fatigue threshold, which zeroes out the chasing score. It adhered to the rule that no outreach should occur when the fatigue filter is triggered, and appropriately selected the suppress_chase tool. The reasoning was coherent, as it calculated the chasing score based on the formula provided but correctly applied the fatigue rule to zero out the score. Context retention was demonstrated by considering the hours_since_last_contact and the assignee's reply, which indicated progress on the task. Tool selection was accurate, as suppress_chase was used due to the fatigue condition being met. All invariants were upheld, resulting in a perfect score."
+      }
+    }
+  ]
+}

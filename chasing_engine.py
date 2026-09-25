@@ -14,17 +14,11 @@ from db_middleware import get_active_tasks
 from maf_graph_state import ChasingWeight
 
 
-def calculate_chasing_priorities(project_id: str) -> list[dict]:
-    """
-    1. Fetches active tasks for `project_id`.
-    2. Calculates datetime math (hours_since_last_contact, days_to_deadline).
-    3. Hydrates the ChasingWeight Pydantic model for each.
-    4. Filters out tasks with chasing_score == 0.0.
-    5. Sorts descending by chasing_score.
-    6. Returns the top tasks to chase.
-    """
+def _score_active_tasks(project_id: str) -> tuple[list[dict], list[dict]]:
+    """Split active tasks into chase-ready vs 24h-fatigue-suppressed."""
     now = datetime.now(timezone.utc)
     prioritized_tasks: list[dict] = []
+    suppressed_tasks: list[dict] = []
 
     for task in get_active_tasks(project_id):
         last_contact = datetime.fromisoformat(task["last_contact_timestamp"])
@@ -41,20 +35,45 @@ def calculate_chasing_priorities(project_id: str) -> list[dict]:
             days_to_deadline=days_to_deadline,
         )
 
+        row = {
+            **task,
+            "hours_since_last_contact": hours_since_last_contact,
+            "days_to_deadline": days_to_deadline,
+            "chasing_score": weight.chasing_score,
+        }
         if weight.chasing_score == 0.0:
-            continue  # 24h Fatigue Cooldown -- Immutable Principle 4 (No Cron)
+            # 24h Fatigue Cooldown -- Immutable Principle 4 (No Cron)
+            suppressed_tasks.append(row)
+            continue
 
         # The original task row, enriched with its computed priority. ChasingWeight
         # itself doesn't carry task_name/assignee/etc., so downstream consumers
         # (chasing_graph.py's draft node) need both merged into one dict.
-        prioritized_tasks.append(
-            {
-                **task,
-                "hours_since_last_contact": hours_since_last_contact,
-                "days_to_deadline": days_to_deadline,
-                "chasing_score": weight.chasing_score,
-            }
-        )
+        prioritized_tasks.append(row)
 
     prioritized_tasks.sort(key=lambda t: t["chasing_score"], reverse=True)
+    return prioritized_tasks, suppressed_tasks
+
+
+def score_active_tasks(project_id: str) -> tuple[list[dict], list[dict]]:
+    """Public wrapper for the fatigue / proximity split used by the scheduler."""
+    return _score_active_tasks(project_id)
+
+
+def calculate_chasing_priorities(project_id: str) -> list[dict]:
+    """
+    1. Fetches active tasks for `project_id`.
+    2. Calculates datetime math (hours_since_last_contact, days_to_deadline).
+    3. Hydrates the ChasingWeight Pydantic model for each.
+    4. Filters out tasks with chasing_score == 0.0.
+    5. Sorts descending by chasing_score.
+    6. Returns the top tasks to chase.
+    """
+    prioritized_tasks, _ = _score_active_tasks(project_id)
     return prioritized_tasks
+
+
+def suppressed_chasing_tasks(project_id: str) -> list[dict]:
+    """Tasks omitted this tick because chasing_score is 0.0 (fatigue)."""
+    _, suppressed = _score_active_tasks(project_id)
+    return suppressed

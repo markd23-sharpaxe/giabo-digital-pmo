@@ -19,10 +19,12 @@ Analyze the incoming message, evaluate the current conversation state, and route
    - Route to `Governance_Worker` if the message involves budget, scope changes, or risks exceeding tolerance.
    - Route to `Change_Control_Clerk` ONLY IF the user explicitly requests a change to the locked project baseline.
    - Route to `Report_Generator` if asked to summarize status (Triggers PM Veto state).
+4. EVENT BUS: Unconsumed blackboard events are listed below for context. Events NEVER route to Change Control. A baseline-slip event is already drafted; do not send the user back to the clerk unless they explicitly ask for another baseline change. Proactive wakes are chosen by the graph subscription table, not by you.
 
 # CONTEXT
 User: {user_name}
 Channel: {channel_type}
 Vague Turns Count: {vague_turns}
+Unread event-bus digest: {event_digest}
 
 Evaluate the user's message and output ONLY a JSON routing decision matching the exact Pydantic schema required by the Graph.

@@ -1,38 +1,35 @@
-"""Microsoft Partner Center SaaS Fulfillment API v2 client.
+"""Microsoft Partner Center SaaS Fulfillment + Metering API v2 client.
 
-Pure Microsoft-API client, deliberately with no database/business-logic
-knowledge (contrast `api/marketplace.py`, which owns the `tenants` upsert and
-the `planId`/`saasSubscriptionStatus` -> `PlanTier`/`SwarmStatus` mapping) --
-same separation `core/graph_client.py` draws for Microsoft Graph.
+Fulfillment calls stay a pure Microsoft-API client (contrast
+`api/marketplace.py`, which owns the `tenants` upsert). Metering adds a
+second surface: `submit_usage_batch` is HTTP-only;
+`emit_unmetered_token_ledger` queries `token_ledger` and marks rows emitted.
 
-Endpoint contract is the documented SaaS Fulfillment API v2
-(https://learn.microsoft.com/en-us/partner-center/marketplace-offers/pc-saas-fulfillment-api-v2),
-not the exact shape in this project's own plan doc -- two corrections worth
-calling out, since both would otherwise silently produce a client that talks
-to nothing real:
+Endpoint contract is the documented SaaS Fulfillment API v2 and Marketplace
+Metering Service APIs -- not guessed paths. Corrections worth calling out:
 
   1. Token endpoint host is `login.microsoftonline.com`, not
-     `login.microsoft.com` (the latter is a marketing/redirect domain, not
-     the AAD token-issuing endpoint real client-credentials requests hit).
+     `login.microsoft.com`.
   2. "Resolve a subscription" is `POST /api/saas/subscriptions/resolve`
-     with the purchase token in the `x-ms-marketplace-token` HEADER (not a
-     GET with `?token=`, and not `/operations/v2/subscriptions/achieve`,
-     which isn't a real Fulfillment API v2 route).
+     with the purchase token in the `x-ms-marketplace-token` HEADER.
+  3. Metering batches go to `POST /api/batchUsageEvent` (not
+     `/api/services/metering/batches`, which is not a real Metering v2 route).
 
-We authenticate as *our own* app (`MicrosoftAppId`/`MicrosoftAppPassword`,
-the same Azure AD app registration already used for the Teams bot and
-Microsoft Graph -- see `api/main.py`/`core/graph_client.py`) against the
-well-known, stable "Microsoft Commercial Marketplace" AAD resource, not a
-customer tenant -- contrast `core/graph_client.py`, which authenticates
-*into* the customer's tenant.
+We authenticate as *our own* app (`MicrosoftAppId`/`MicrosoftAppPassword`)
+against the well-known "Microsoft Commercial Marketplace" AAD resource.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any, AsyncIterator, Optional
+from uuid import UUID
 
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -46,9 +43,14 @@ _MARKETPLACE_SCOPE = f"{_MARKETPLACE_RESOURCE_ID}/.default"
 
 _TOKEN_URL_TEMPLATE = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 _API_BASE = "https://marketplaceapi.microsoft.com/api/saas/subscriptions"
+_METERING_BATCH_URL = "https://marketplaceapi.microsoft.com/api/batchUsageEvent"
 _API_VERSION = "2018-08-31"
+_METERING_BATCH_LIMIT = 25
+_DEFAULT_METERING_DIMENSION = "token_compute_overage"
 
 _HTTP_TIMEOUT = 30.0
+
+logger = logging.getLogger(__name__)
 
 
 class MarketplaceApiError(Exception):
@@ -267,3 +269,288 @@ async def update_operation_status(
             f"/{subscription_id}/operations/{operation_id}",
             json_body={"status": status},
         )
+
+
+# =============================================================================
+# Marketplace Metering Service v2 -- batch usage events
+# =============================================================================
+
+
+def _metering_dimension() -> str:
+    return os.environ.get("MARKETPLACE_METERING_DIMENSION", _DEFAULT_METERING_DIMENSION).strip() or _DEFAULT_METERING_DIMENSION
+
+
+@dataclass
+class MeteringEmitResult:
+    """Outcome of one `emit_unmetered_token_ledger` run."""
+
+    events_submitted: int = 0
+    rows_emitted: int = 0
+    rows_skipped: int = 0
+    batches: int = 0
+    errors: list[str] = field(default_factory=list)
+
+
+@dataclass
+class _UsageBucket:
+    resource_id: str
+    plan_id: str
+    effective_start: datetime
+    quantity: Decimal
+    row_ids: list[int]
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _clamp_usage_hour(created_at: datetime, now_utc: datetime) -> datetime:
+    """Hour bucket for `effectiveStartTime`, clamped into Microsoft's 24h window."""
+    created = _as_utc(created_at).replace(minute=0, second=0, microsecond=0)
+    clamp_hour = (now_utc - timedelta(hours=23)).replace(minute=0, second=0, microsecond=0)
+    return created if created >= clamp_hour else clamp_hour
+
+
+def _usage_event_payload(bucket: _UsageBucket, dimension: str) -> dict[str, Any]:
+    return {
+        "resourceId": bucket.resource_id,
+        "quantity": float(bucket.quantity),
+        "dimension": dimension,
+        "effectiveStartTime": bucket.effective_start.strftime("%Y-%m-%dT%H:%M:%S"),
+        "planId": bucket.plan_id,
+    }
+
+
+def _chunks(items: list[_UsageBucket], size: int) -> list[list[_UsageBucket]]:
+    return [items[i : i + size] for i in range(0, len(items), size)]
+
+
+@retry(
+    reraise=True,
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=0.5, max=4),
+    retry=retry_if_exception_type(httpx.TransportError),
+)
+async def _post_usage_batch(http_client: httpx.AsyncClient, events: list[dict[str, Any]]) -> dict[str, Any]:
+    token = await _get_access_token(http_client)
+    response = await http_client.post(
+        _METERING_BATCH_URL,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        params={"api-version": _API_VERSION},
+        json={"request": events},
+    )
+    if response.status_code >= 400:
+        raise MarketplaceApiError(
+            f"POST /api/batchUsageEvent failed: {response.status_code} {response.text}",
+            status_code=response.status_code,
+        )
+    if not response.content:
+        return {}
+    return response.json()
+
+
+async def submit_usage_batch(
+    events: list[dict[str, Any]],
+    *,
+    http_client: Optional[httpx.AsyncClient] = None,
+) -> dict[str, Any]:
+    """`POST /api/batchUsageEvent` -- emit up to 25 usage events.
+
+    Each event must include `resourceId`, `quantity`, `dimension`,
+    `effectiveStartTime`, and `planId` per the Metering Service v2 contract.
+    """
+    if not events:
+        return {"count": 0, "result": []}
+    if len(events) > _METERING_BATCH_LIMIT:
+        raise MarketplaceApiError(
+            f"Metering batch exceeds the Microsoft limit of {_METERING_BATCH_LIMIT} events "
+            f"({len(events)} given).",
+        )
+    async with _client_or(http_client) as client:
+        return await _post_usage_batch(client, events)
+
+
+def _ledger_billable(entry: Any) -> Decimal:
+    if getattr(entry, "billable_cost_usd", None) is not None:
+        return Decimal(entry.billable_cost_usd)
+    return Decimal(entry.raw_cost_usd) * Decimal(entry.overage_multiplier)
+
+
+def _aggregate_unmetered_rows(
+    session: Any,
+    now_utc: datetime,
+    tenant_id: Optional[UUID] = None,
+) -> tuple[list[_UsageBucket], int]:
+    """Group unmetered ledger rows by subscription + UTC hour. Returns
+    (buckets, skipped_row_count).
+    """
+    from sqlalchemy import select
+
+    from db.models import Tenant, TokenLedgerEntry
+
+    stmt = (
+        select(TokenLedgerEntry, Tenant)
+        .join(Tenant, TokenLedgerEntry.tenant_id == Tenant.id)
+        .where(TokenLedgerEntry.azure_metering_emitted.is_(False))
+        .order_by(TokenLedgerEntry.id)
+    )
+    if tenant_id is not None:
+        stmt = stmt.where(TokenLedgerEntry.tenant_id == tenant_id)
+    rows = session.execute(stmt).all()
+
+    buckets: dict[tuple[str, str, datetime], _UsageBucket] = {}
+    skipped = 0
+    for entry, tenant in rows:
+        plan_id = (tenant.azure_plan_id or "").strip()
+        if not plan_id or tenant.azure_subscription_id is None:
+            skipped += 1
+            continue
+        quantity = _ledger_billable(entry)
+        if quantity <= 0:
+            skipped += 1
+            continue
+        hour = _clamp_usage_hour(entry.created_at, now_utc)
+        resource_id = str(tenant.azure_subscription_id)
+        key = (resource_id, plan_id, hour)
+        bucket = buckets.get(key)
+        if bucket is None:
+            bucket = _UsageBucket(
+                resource_id=resource_id,
+                plan_id=plan_id,
+                effective_start=hour,
+                quantity=Decimal("0"),
+                row_ids=[],
+            )
+            buckets[key] = bucket
+        bucket.quantity += quantity
+        bucket.row_ids.append(entry.id)
+    return list(buckets.values()), skipped
+
+
+def _mark_rows_emitted(session: Any, row_ids: list[int], emission_id: Optional[str], emitted_at: datetime) -> int:
+    from sqlalchemy import select
+
+    from db.models import TokenLedgerEntry
+
+    if not row_ids:
+        return 0
+    entries = session.execute(select(TokenLedgerEntry).where(TokenLedgerEntry.id.in_(row_ids))).scalars().all()
+    for entry in entries:
+        entry.azure_metering_emitted = True
+        entry.azure_metering_emission_id = emission_id
+        entry.azure_metering_emitted_at = emitted_at
+    return len(entries)
+
+
+def _batch_result_items(body: dict[str, Any]) -> list[dict[str, Any]]:
+    items = body.get("result")
+    if items is None:
+        items = body.get("results")
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, dict)]
+
+
+def _event_succeeded(item: dict[str, Any]) -> bool:
+    status = str(item.get("status") or "").lower()
+    return status in {"accepted", "duplicate"}
+
+
+async def emit_unmetered_token_ledger(
+    *,
+    http_client: Optional[httpx.AsyncClient] = None,
+    now_utc: Optional[datetime] = None,
+    tenant_id: Optional[UUID] = None,
+) -> MeteringEmitResult:
+    """Query unmetered `token_ledger` rows, POST them as usage batches, and
+    mark accepted/duplicate source rows `azure_metering_emitted = TRUE`.
+    """
+    from db.session import get_session
+
+    result = MeteringEmitResult()
+    now = now_utc or datetime.now(timezone.utc)
+    dimension = _metering_dimension()
+
+    with get_session() as session:
+        buckets, skipped = _aggregate_unmetered_rows(session, now, tenant_id=tenant_id)
+        result.rows_skipped = skipped
+        if not buckets:
+            return result
+
+        emitted_at = datetime.now(timezone.utc)
+        for chunk in _chunks(buckets, _METERING_BATCH_LIMIT):
+            events = [_usage_event_payload(bucket, dimension) for bucket in chunk]
+            result.batches += 1
+            result.events_submitted += len(events)
+            try:
+                body = await submit_usage_batch(events, http_client=http_client)
+            except MarketplaceApiError as exc:
+                logger.warning("marketplace metering batch failed: %s", exc)
+                result.errors.append(str(exc))
+                continue
+
+            items = _batch_result_items(body)
+            if not items and not result.errors:
+                # 200 with an empty result list still means Microsoft accepted the batch.
+                for bucket in chunk:
+                    result.rows_emitted += _mark_rows_emitted(session, bucket.row_ids, None, emitted_at)
+                continue
+
+            by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+            for item in items:
+                key = (
+                    str(item.get("resourceId") or ""),
+                    str(item.get("planId") or ""),
+                    str(item.get("effectiveStartTime") or ""),
+                )
+                by_key[key] = item
+
+            for bucket, event in zip(chunk, events):
+                item = by_key.get((event["resourceId"], event["planId"], event["effectiveStartTime"]))
+                if item is None:
+                    # Per-event results omitted or unmatched -- treat HTTP 200 as success.
+                    if not items:
+                        result.rows_emitted += _mark_rows_emitted(session, bucket.row_ids, None, emitted_at)
+                    continue
+                if not _event_succeeded(item):
+                    logger.warning(
+                        "marketplace metering event not accepted: status=%s resourceId=%s",
+                        item.get("status"),
+                        event["resourceId"],
+                    )
+                    continue
+                emission_id = item.get("usageEventId")
+                result.rows_emitted += _mark_rows_emitted(
+                    session,
+                    bucket.row_ids,
+                    str(emission_id) if emission_id else None,
+                    emitted_at,
+                )
+
+    return result
+
+
+def _main() -> None:
+    import argparse
+    import asyncio
+
+    logging.basicConfig(level=logging.INFO)
+    parser = argparse.ArgumentParser(
+        description="Emit unmetered token_ledger rows to the Azure Marketplace Metering Service."
+    )
+    parser.parse_args()
+    stats = asyncio.run(emit_unmetered_token_ledger())
+    print(
+        f"events_submitted={stats.events_submitted} rows_emitted={stats.rows_emitted} "
+        f"rows_skipped={stats.rows_skipped} batches={stats.batches} errors={len(stats.errors)}"
+    )
+
+
+if __name__ == "__main__":
+    _main()

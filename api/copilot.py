@@ -360,6 +360,6 @@ async def get_usage_telemetry(
             raw_token_spend_usd=spend,
             monthly_token_allowance_usd=allowance,
             billed_overage_usd=tenant.billed_overage_usd or Decimal("0"),
-            is_overage=spend > allowance,
+            is_overage=spend > Decimal("0"),
             trial_end_date=tenant.trial_end_date,
         )

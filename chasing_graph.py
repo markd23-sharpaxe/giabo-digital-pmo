@@ -23,8 +23,10 @@ from agent_framework import Agent, Executor, WorkflowBuilder, WorkflowContext, h
 from pydantic import BaseModel
 from typing_extensions import Never
 
-from chasing_engine import calculate_chasing_priorities
+from app_graph import persist_blackboard_event
+from chasing_engine import calculate_chasing_priorities, suppressed_chasing_tasks
 from db_middleware import mark_task_contacted
+from maf_graph_state import BlackboardEvent, EventType
 
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "chasing_agent.md"
 
@@ -64,6 +66,20 @@ class EvaluatePrioritiesNode(Executor):
     @handler
     async def evaluate(self, message: ChasingTick, ctx: WorkflowContext[PrioritizedTasks]) -> None:
         tasks = calculate_chasing_priorities(message.project_id)
+        for task in suppressed_chasing_tasks(message.project_id):
+            persist_blackboard_event(
+                BlackboardEvent(
+                    event_type=EventType.CHASE_SUPPRESSED,
+                    publisher="chasing_agent",
+                    project_id=message.project_id,
+                    correlation_id=task["task_id"],
+                    payload={
+                        "task_id": task["task_id"],
+                        "hours_since_last_contact": task["hours_since_last_contact"],
+                        "chasing_score": task["chasing_score"],
+                    },
+                )
+            )
         await ctx.send_message(PrioritizedTasks(project_id=message.project_id, tasks=tasks))
 
 
@@ -118,6 +134,15 @@ class DraftMessagesNode(Executor):
             # re-engage, since nothing else ever updates that column. A
             # failed stamp shouldn't discard an otherwise-successful draft,
             # so it's logged rather than raised.
+            persist_blackboard_event(
+                BlackboardEvent(
+                    event_type=EventType.CHASE_SENT,
+                    publisher="chasing_agent",
+                    project_id=message.project_id,
+                    correlation_id=task["task_id"],
+                    payload={"task_id": task["task_id"], "chasing_score": task["chasing_score"]},
+                )
+            )
             try:
                 mark_task_contacted(task["task_id"], message.project_id)
             except Exception:

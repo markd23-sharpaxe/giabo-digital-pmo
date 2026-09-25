@@ -49,6 +49,7 @@ except ImportError:  # pragma: no cover
 from core.graph_client import build_graph_client
 from db.models import DocumentCache, Project
 from db.session import get_session
+from maf_graph_state import BlackboardEvent, EventType, record_ingress_event
 
 logger = logging.getLogger(__name__)
 
@@ -284,6 +285,23 @@ async def _process_drive_item(
         stats.items_created += 1
     else:
         stats.items_updated += 1
+    record_ingress_event(
+        project_id,
+        BlackboardEvent(
+            event_type=EventType.DOCUMENT_INGESTED,
+            publisher="sharepoint_delta_ingestion",
+            project_id=str(project_id),
+            correlation_id=item.id,
+            payload={
+                "item_id": item.id,
+                "content_hash": content_hash,
+                "sharepoint_drive_id": drive_id,
+                "item_path": item_path,
+                "source_type": source_type,
+                "is_insert": is_insert,
+            },
+        ),
+    )
 
 
 async def _sync_drive(

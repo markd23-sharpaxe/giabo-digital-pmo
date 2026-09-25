@@ -111,10 +111,9 @@ CREATE TABLE tenants (
     trial_start_date           DATE,
     trial_end_date             DATE GENERATED ALWAYS AS (trial_start_date + 14) STORED,
 
-    -- Token allowance is fixed per plan tier: $20 (trial) / $350 (paid monthly).
-    monthly_token_allowance_usd NUMERIC(10, 2) GENERATED ALWAYS AS (
-        CASE WHEN plan_tier = 'paid_monthly' THEN 350.00 ELSE 20.00 END
-    ) STORED,
+    -- Monthly Free Plan is usage-based: no included token allowance.
+    -- Marketplace bills raw OpenAI spend at 2.50x via token_ledger.
+    monthly_token_allowance_usd NUMERIC(10, 2) GENERATED ALWAYS AS (0.00) STORED,
 
     -- Raw (pre-markup) accumulated token spend for the current period.
     -- MUST be mutated via `SELECT ... FOR UPDATE` on this row (billing gate
@@ -360,9 +359,8 @@ CREATE TABLE token_ledger (
     total_tokens                  INTEGER GENERATED ALWAYS AS (prompt_tokens + completion_tokens) STORED,
 
     raw_cost_usd                  NUMERIC(12, 6) NOT NULL CHECK (raw_cost_usd >= 0),
-    -- 3x overage multiplier applied once a paid_monthly tenant's raw spend
-    -- exceeds the $350 monthly allowance (02-maf-billing-gates.mdc, Section 1).
-    overage_multiplier             NUMERIC(4, 2) NOT NULL DEFAULT 1.00 CHECK (overage_multiplier >= 1.00),
+    -- 2.50x Marketplace metered markup ($1.00 billed per $0.40 raw) on every call.
+    overage_multiplier             NUMERIC(4, 2) NOT NULL DEFAULT 2.50 CHECK (overage_multiplier >= 1.00),
     billable_cost_usd              NUMERIC(12, 6) GENERATED ALWAYS AS (raw_cost_usd * overage_multiplier) STORED,
     is_overage                    BOOLEAN NOT NULL DEFAULT FALSE,
 
@@ -375,7 +373,7 @@ CREATE TABLE token_ledger (
     created_at                    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE token_ledger IS 'Per-call raw token usage, overage-adjusted billable cost, and Azure Marketplace Metering emission status.';
+COMMENT ON TABLE token_ledger IS 'Per-call raw token usage, 2.50x metered billable cost, and Azure Marketplace Metering emission status.';
 
 CREATE INDEX idx_token_ledger_tenant_id ON token_ledger (tenant_id);
 CREATE INDEX idx_token_ledger_agent_execution_id ON token_ledger (agent_execution_id);
@@ -438,3 +436,54 @@ CREATE TRIGGER trg_tasks_updated_at
 CREATE INDEX idx_tasks_project_id ON tasks (project_id);
 CREATE INDEX idx_tasks_tenant_id ON tasks (tenant_id);
 CREATE INDEX idx_tasks_deadline ON tasks (deadline) WHERE deadline IS NOT NULL;
+
+-- =============================================================================
+-- 8. EVAL_AUDIT_LOGS
+-- Synthetic eval suite (tests/evals) LLM-as-a-judge audit trail.
+-- =============================================================================
+CREATE TABLE eval_audit_logs (
+    id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id                          UUID NOT NULL,
+    suite                           TEXT NOT NULL,
+    scenario_id                     TEXT NOT NULL,
+    target_agent_role               TEXT,
+    originating_rule                TEXT,
+    pass                            BOOLEAN NOT NULL,
+    score                           NUMERIC(5, 2) NOT NULL,
+    reasoning_coherence             NUMERIC(5, 2) NOT NULL,
+    context_retention               NUMERIC(5, 2) NOT NULL,
+    tool_selection_correctness      NUMERIC(5, 2) NOT NULL,
+    justification                   TEXT NOT NULL,
+    actual_tool                     TEXT,
+    gold_expected                   JSONB,
+    reasoning_trace                 JSONB NOT NULL,
+    tool_log                        JSONB NOT NULL,
+    judge_verdict                   JSONB NOT NULL,
+    model_deployment                TEXT,
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE eval_audit_logs IS 'LLM-as-a-judge eval runs (chaser + 27-role GIABO framework suite).';
+
+CREATE INDEX idx_eval_audit_logs_run_id ON eval_audit_logs (run_id);
+CREATE INDEX idx_eval_audit_logs_suite ON eval_audit_logs (suite);
+CREATE INDEX idx_eval_audit_logs_scenario_id ON eval_audit_logs (scenario_id);
+
+-- =============================================================================
+-- 9. EVENT_BUS -- Universal blackboard for proactive multi-agent coordination
+-- =============================================================================
+CREATE TABLE event_bus (
+    event_id                        TEXT PRIMARY KEY,
+    project_id                      TEXT NOT NULL,
+    event_type                      TEXT NOT NULL,
+    publisher                       TEXT NOT NULL,
+    correlation_id                  TEXT,
+    payload                         JSONB NOT NULL DEFAULT '{}'::jsonb,
+    consumed_by                     JSONB NOT NULL DEFAULT '[]'::jsonb,
+    occurred_at                     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE event_bus IS 'Append-only blackboard events shared across conversational sibling runs (including while PM Veto is paused).';
+
+CREATE INDEX idx_event_bus_project_occurred ON event_bus (project_id, occurred_at);
+CREATE INDEX idx_event_bus_type ON event_bus (event_type);

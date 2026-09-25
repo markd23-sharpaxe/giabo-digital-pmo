@@ -1,0 +1,24 @@
+{
+  "name": "pmo-digital-employee",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval:chaser": "tsx tests/evals/validate.ts",
+    "eval:chaser:runner": "tsx tests/evals/runners/chaserEvalRunner.ts",
+    "eval:giabo:runner": "tsx tests/evals/runners/giaboFrameworkEvalRunner.ts",
+    "eval:generate": "tsx tests/evals/datasets/generateBulkScenarios.ts",
+    "eval:bulk": "tsx tests/evals/runners/bulkEvalRunner.ts",
+    "eval:human-report": "tsx tests/evals/runners/generateHumanReviewReport.ts",
+    "eval:ai-studio-spec": "tsx tests/evals/runners/generateGiaboFrameworkSpec.ts",
+    "eval:structured": "tsx tests/evals/runners/structuredEvalRunner.ts"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "dotenv": "^16.4.7",
+    "openai": "^4.77.0",
+    "pg": "^8.13.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "zod": "^3.24.2"
+  }
+}

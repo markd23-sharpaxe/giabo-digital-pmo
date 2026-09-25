@@ -62,6 +62,7 @@ import logging
 import os
 import sys
 import traceback
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -70,13 +71,15 @@ from botbuilder.integration.aiohttp import CloudAdapter, ConfigurationBotFramewo
 from botbuilder.schema import Activity, ActivityTypes
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.bot import PMOBot
 from api.copilot import router as copilot_router
 from api.legal import router as legal_router
 from api.marketplace import router as marketplace_router
+from api.templates import templates
+from core.scheduler import shutdown_background_scheduler, start_background_scheduler
 from app_graph import (
     build_app_graph,
     build_default_agile_chat_agent,
@@ -265,7 +268,22 @@ CONVERSATION_STATE = ConversationState(MemoryStorage())
 
 BOT = PMOBot(CONVERSATION_STATE, _workflow, _checkpoint_storage)
 
-app = FastAPI(title="GIABO Digital PMO -- Teams Bot", openapi_url="/internal/openapi.json")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start the Morning Heartbeat scheduler with the API process and stop it
+    on shutdown. `ENABLE_BACKGROUND_SCHEDULER` gates the jobs themselves.
+    """
+    start_background_scheduler()
+    yield
+    await shutdown_background_scheduler()
+
+
+app = FastAPI(
+    title="GIABO Digital PMO -- Teams Bot",
+    openapi_url="/internal/openapi.json",
+    lifespan=lifespan,
+)
 
 # M365 Copilot / Teams sideloading fetches plugin metadata and then calls
 # the API bridge from Microsoft's cloud runners. Without CORS, browser-based
@@ -279,16 +297,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Declarative Agent Architecture Pivot: the standalone Jinja2 marketing
-# homepage/tenant-admin-dashboard (formerly `api/web.py`) is gone -- PMO
-# interaction now happens natively inside Microsoft 365 Copilot (see
-# `appPackage/`) and Microsoft Teams chat. `static/css/theme.css` is kept
-# mounted because `templates/landing.html`/`privacy.html`/`terms.html`
-# (Azure Marketplace's required post-purchase redirect + the legal URLs
-# Partner Center and `appPackage/manifest.json` both require) still use it.
-# Mounted by absolute path so it works regardless of the process's current
-# working directory (e.g. `uvicorn api.main:app` run from a different cwd
-# than the repo root).
+
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request) -> HTMLResponse:
+    """Public marketing homepage. Defined on the app so Azure cannot miss it
+    if a router include is stale.
+    """
+    return templates.TemplateResponse(request, "index.html", {})
+
+
+# Public marketing homepage, Agent Handbook, Marketplace landing, and legal
+# pages all share `static/css/theme.css` and `static/images/logo.png`.
+# Mounted by absolute path so `/static` resolves on Azure even when the
+# process cwd is not the repo root.
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
@@ -298,8 +319,8 @@ app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 # runtime described in `appPackage/openapi.json`. See `api/copilot.py`.
 app.include_router(copilot_router)
 
-# /privacy, /terms -- the two dashboard-era routes that survive the pivot
-# (required by Partner Center + appPackage/manifest.json). See `api/legal.py`.
+# /, /privacy, /terms, /guide -- public marketing + Partner Center legal
+# URLs + the Agent Handbook. See `api/legal.py`.
 app.include_router(legal_router)
 
 # Microsoft Partner Center SaaS Fulfillment API v2: GET /marketplace/landing

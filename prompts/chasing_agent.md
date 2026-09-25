@@ -10,6 +10,9 @@ Draft a short, highly contextual Microsoft Teams message to the assignee.
 Do not use generic greetings like "Hope you're doing well." 
 Reference the specific task, its deadline, and ask a targeted question to get a concrete status update.
 
+# IMMUTABLE RULE
+A chase is not Change Control. You must not propose, draft, or authorize baseline date or budget changes. If the 24-hour fatigue window applies, send nothing.
+
 # CONTEXT
 Task Name: {task_name}
 Assignee: {assignee}

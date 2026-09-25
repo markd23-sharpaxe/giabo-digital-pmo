@@ -32,10 +32,13 @@ from app_graph import (
     PendingExceptionRequest,
     PendingVetoRequest,
     PMOState,
+    maybe_run_proactive_followup,
+    record_ingress_event,
     resume_after_exception,
     resume_after_veto,
     run_turn,
 )
+from maf_graph_state import BlackboardEvent, EventType, append_event
 
 logger = logging.getLogger(__name__)
 
@@ -113,9 +116,32 @@ class PMOBot(ActivityHandler):
 
         state = await self._load_pmo_state(turn_context, conversation_id, user_id)
         state.message_history.append({"role": "user", "content": activity.text})
+        inbound = BlackboardEvent(
+            event_type=EventType.TEAMS_MESSAGE_RECEIVED,
+            publisher="teams_bot",
+            project_id=state.project_id,
+            correlation_id=activity.id,
+            payload={
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "text": activity.text,
+            },
+        )
+        state = append_event(state, inbound)
+        record_ingress_event(state.project_id, inbound)
 
         result = await run_turn(self._workflow, state, checkpoint_storage=self._checkpoint_storage)
+        if isinstance(result, PendingVetoRequest) and result.state is not None:
+            state.event_bus = list(result.state.event_bus)
+            state.pending_change = result.state.pending_change
+            state.requires_pm_veto = result.state.requires_pm_veto
         await self._send_result(turn_context, result, state)
+        if not isinstance(result, HardHaltMessage):
+            followup = await maybe_run_proactive_followup(
+                self._workflow, state, checkpoint_storage=self._checkpoint_storage
+            )
+            if followup is not None:
+                await self._send_result(turn_context, followup, state)
 
     # -------------------------------------------------------------------
     # Normal chat

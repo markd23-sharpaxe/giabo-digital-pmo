@@ -5,7 +5,7 @@ gate before invoking any Azure OpenAI model:
 
     1. assert_pilot_feature_access  -- is this agent allowed on this plan?
     2. check_pilot_project_limit    -- has the tenant hit its project cap?
-    3. check_pilot_compute_cap      -- TOCTOU-safe spend-vs-allowance check + reservation
+    3. check_pilot_compute_cap      -- TOCTOU-safe 2.5x metered reservation
     4. check_credit_balance         -- can the tenant still transact at all?
 
 Each stage raises a `BillingGateError` subclass on rejection; `run_billing_gates`
@@ -19,7 +19,6 @@ from __future__ import annotations
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import date
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
@@ -102,8 +101,14 @@ PILOT_PROJECT_LIMITS: dict[PlanTier, int] = {
     PlanTier.PAID_MONTHLY: 25,
 }
 
-# $3.00 billed per $1.00 raw spend beyond the $350 monthly allowance (Section 1).
-OVERAGE_MULTIPLIER = Decimal("3.00")
+# $1.00 billed per $0.40 raw OpenAI spend -- 2.5x Marketplace metered markup.
+# Applied to every token, not only spend past an included allowance.
+OVERAGE_MULTIPLIER = Decimal("2.50")
+
+
+def billable_cost_usd(raw_cost_usd: Decimal, multiplier: Decimal = OVERAGE_MULTIPLIER) -> Decimal:
+    """Marketplace-billable dollars for a raw token cost."""
+    return raw_cost_usd * multiplier
 
 
 # =============================================================================
@@ -211,58 +216,26 @@ def check_pilot_project_limit(session: Session, tenant: Tenant) -> None:
 
 
 def check_pilot_compute_cap(session: Session, tenant_id: uuid.UUID, estimated_cost_usd: Decimal) -> BillingGateResult:
-    """Atomically check-and-reserve `estimated_cost_usd` against the tenant's allowance.
+    """Atomically reserve `estimated_cost_usd` and its 2.5x metered bill.
 
-    Locks the tenant row with ``SELECT ... FOR UPDATE`` (Section 2: "Atomic
-    cost accumulation in PostgreSQL using SELECT FOR UPDATE") so two
-    concurrent agent-node executions can never both read a stale
-    `raw_token_spend_usd`, each independently decide they fit under the cap,
-    and jointly overshoot it -- the classic Time-Of-Check-to-Time-Of-Use race.
+    Locks the tenant row with ``SELECT ... FOR UPDATE`` so two concurrent
+    agent-node executions cannot both read a stale `raw_token_spend_usd`
+    and jointly double-count the reservation.
 
-    The estimated cost is added to `raw_token_spend_usd` *before* the row
-    lock is released (i.e. before the caller commits), which reserves the
-    budget atomically with the check. Callers MUST commit (or roll back)
-    promptly after this call to release the lock, and should call
-    `reconcile_actual_cost` once the real token usage is known so the
-    reservation converges on the true spend.
+    Every token is usage-billed: there is no included allowance and this
+    gate never hard-halts on spend or trial dates. Callers MUST commit
+    (or roll back) promptly after this call to release the lock, and
+    should call `reconcile_actual_cost` once real token usage is known.
     """
     tenant = session.execute(select(Tenant).where(Tenant.id == tenant_id).with_for_update()).scalar_one()
 
-    if tenant.plan_tier is PlanTier.FREE_TRIAL:
-        today = date.today()
-        trial_expired_by_date = tenant.trial_end_date is not None and today > tenant.trial_end_date
-        trial_expired_by_spend = (tenant.raw_token_spend_usd + estimated_cost_usd) > tenant.monthly_token_allowance_usd
-
-        if trial_expired_by_date or trial_expired_by_spend:
-            tenant.swarm_status = SwarmStatus.TRIAL_EXPIRED
-            session.flush()
-            reason = "14-day trial window elapsed" if trial_expired_by_date else "$20.00 token allowance exceeded"
-            raise ComputeCapExceededError(
-                f"Tenant {tenant_id} free_trial hard halt: {reason}.",
-                gate="checkPilotComputeCap",
-                halt=True,
-                new_swarm_status=SwarmStatus.TRIAL_EXPIRED,
-            )
-
-        tenant.raw_token_spend_usd += estimated_cost_usd
-        session.flush()
-        return BillingGateResult(reserved_cost_usd=estimated_cost_usd)
-
-    # paid_monthly never hard-halts on spend; it flips into 3x overage once
-    # the $350 monthly allowance is exceeded.
-    projected_spend = tenant.raw_token_spend_usd + estimated_cost_usd
-    is_overage = projected_spend > tenant.monthly_token_allowance_usd
-    overage_multiplier = OVERAGE_MULTIPLIER if is_overage else Decimal("1.00")
-
-    tenant.raw_token_spend_usd = projected_spend
-    if is_overage:
-        overage_amount = min(estimated_cost_usd, projected_spend - tenant.monthly_token_allowance_usd)
-        tenant.billed_overage_usd += overage_amount * OVERAGE_MULTIPLIER
+    tenant.raw_token_spend_usd += estimated_cost_usd
+    tenant.billed_overage_usd += billable_cost_usd(estimated_cost_usd)
     session.flush()
 
     return BillingGateResult(
-        is_overage=is_overage,
-        overage_multiplier=overage_multiplier,
+        is_overage=True,
+        overage_multiplier=OVERAGE_MULTIPLIER,
         reserved_cost_usd=estimated_cost_usd,
     )
 
@@ -283,6 +256,7 @@ def reconcile_actual_cost(
         return
     tenant = session.execute(select(Tenant).where(Tenant.id == tenant_id).with_for_update()).scalar_one()
     tenant.raw_token_spend_usd += delta
+    tenant.billed_overage_usd += billable_cost_usd(delta)
     session.flush()
 
 

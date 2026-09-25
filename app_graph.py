@@ -86,13 +86,19 @@ from db_middleware import (
     commit_task_progress,
 )
 from maf_graph_state import (
+    BlackboardEvent,
     BlockerPayload,
+    EventType,
     ExtractedEntity,
     PendingChangePayload,
     PMOState,
     RiskEscalationPayload,
     TaskProgressPayload,
     TriageRouterDecision,
+    append_event,
+    mark_event_consumed,
+    persist_blackboard_event,
+    record_ingress_event,
 )
 from ui.cards import render_exception_card, render_pm_veto_card
 
@@ -121,10 +127,13 @@ DEFAULT_CHECKPOINT_DIR = Path(__file__).parent / ".checkpoints"
 CHECKPOINT_ALLOWED_TYPES = [
     "maf_graph_state:PMOState",
     "maf_graph_state:TriageRouterDecision",
+    "maf_graph_state:ExtractedEntity",
     "maf_graph_state:PendingChangePayload",
     "maf_graph_state:TaskProgressPayload",
     "maf_graph_state:BlockerPayload",
     "maf_graph_state:RiskEscalationPayload",
+    "maf_graph_state:BlackboardEvent",
+    "maf_graph_state:EventType",
     "app_graph:HardHaltMessage",
     "app_graph:RoutedMessage",
     "app_graph:ChangeControlOutput",
@@ -154,6 +163,7 @@ __all__ = [
     "TriageRouterDecision",
     "HardHaltMessage",
     "RoutedMessage",
+    "friction_breaker_fires",
     "ChangeControlOutput",
     "BaselineCommitInput",
     "PendingVetoRequest",
@@ -186,6 +196,11 @@ __all__ = [
     "run_turn",
     "resume_after_veto",
     "resume_after_exception",
+    "maybe_run_proactive_followup",
+    "EVENT_SUBSCRIPTIONS",
+    "next_proactive_target",
+    "persist_blackboard_event",
+    "record_ingress_event",
     "build_default_router_chat_agent",
     "build_default_change_control_chat_agent",
     "build_default_pmp_chat_agent",
@@ -214,6 +229,76 @@ class RoutedMessage(BaseModel):
     decision: Optional[TriageRouterDecision] = None
     failed: bool = False
     error: Optional[str] = None
+
+
+def friction_breaker_fires(msg: RoutedMessage) -> bool:
+    """True when the Friction Breaker must override the LLM route.
+
+    `vague_turns >= 2` wins even if `decision.next_node` is a specialist
+    worker; an LLM that independently chose `escalation_node` also lands
+    here. Evaluated as a routing *edge* (not inside `RouterNode`) so the
+    override is a graph invariant, not a prompt suggestion.
+    """
+    return msg.state.vague_turns >= 2 or (
+        msg.decision is not None and msg.decision.next_node == "escalation_node"
+    )
+
+
+# Deterministic event-bus subscriptions. Never wakes change_control_clerk.
+EVENT_SUBSCRIPTIONS: dict[EventType, str] = {
+    EventType.BASELINE_SLIP_REQUESTED: "governance_worker",
+    EventType.CRITICAL_PATH_SLIPPED: "governance_worker",
+    EventType.BASELINE_CHANGE_REJECTED: "governance_worker",
+}
+
+
+def _load_unread_events(project_id: str) -> list[BlackboardEvent]:
+    try:
+        from db.models import EventBusRow
+        from db.session import get_session
+
+        with get_session() as session:
+            rows = (
+                session.query(EventBusRow)
+                .filter(EventBusRow.project_id == project_id)
+                .order_by(EventBusRow.occurred_at.asc())
+                .all()
+            )
+        return [
+            BlackboardEvent(
+                event_id=row.event_id,
+                occurred_at=row.occurred_at,
+                event_type=EventType(row.event_type),
+                publisher=row.publisher,
+                project_id=row.project_id,
+                correlation_id=row.correlation_id,
+                payload=row.payload or {},
+                consumed_by=list(row.consumed_by or []),
+            )
+            for row in rows
+        ]
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("event_bus load skipped: %s", exc)
+        return []
+
+
+def next_proactive_target(state: PMOState) -> Optional[tuple[BlackboardEvent, str]]:
+    """First unread subscribed event whose target is not Change Control."""
+    for event in state.event_bus:
+        target = EVENT_SUBSCRIPTIONS.get(event.event_type)
+        if (
+            target
+            and target != "change_control_clerk"
+            and target not in event.consumed_by
+        ):
+            return event, target
+    return None
+
+
+def _publish(state: PMOState, event: BlackboardEvent) -> PMOState:
+    updated = append_event(state, event)
+    persist_blackboard_event(event)
+    return updated
 
 
 # =============================================================================
@@ -281,12 +366,22 @@ class WorkerValidationError(Exception):
     """
 
 
-def _render_prompt(*, user_name: str, channel_type: str, vague_turns: int) -> str:
+def _event_digest(state: PMOState) -> str:
+    unread = [
+        f"{item.event_type.value} by {item.publisher} corr={item.correlation_id}"
+        for item in state.event_bus
+        if not item.consumed_by
+    ]
+    return "; ".join(unread) if unread else "none"
+
+
+def _render_prompt(*, user_name: str, channel_type: str, vague_turns: int, event_digest: str = "none") -> str:
     template = _PROMPT_PATH.read_text(encoding="utf-8")
     return (
         template.replace("{user_name}", user_name)
         .replace("{channel_type}", channel_type)
         .replace("{vague_turns}", str(vague_turns))
+        .replace("{event_digest}", event_digest)
     )
 
 
@@ -296,7 +391,12 @@ def _render_change_control_prompt(*, user_request: str) -> str:
 
 
 def _render_worker_prompt(
-    prompt_path: Path, *, user_message: str, extracted_entities: Optional[list[ExtractedEntity]]
+    prompt_path: Path,
+    *,
+    user_message: str,
+    extracted_entities: Optional[list[ExtractedEntity]],
+    wake_reason: str = "user_message",
+    event_digest: str = "none",
 ) -> str:
     """Shared renderer for the three Tri-Framework specialist prompts
     (`pmp_worker.md` / `agile_worker.md` / `governance_worker.md`): all use
@@ -315,7 +415,12 @@ def _render_worker_prompt(
         if extracted_entities
         else "None provided"
     )
-    return template.replace("{user_message}", user_message).replace("{extracted_entities}", entities_text)
+    return (
+        template.replace("{user_message}", user_message)
+        .replace("{extracted_entities}", entities_text)
+        .replace("{wake_reason}", wake_reason)
+        .replace("{event_digest}", event_digest)
+    )
 
 
 @retry(stop=stop_after_attempt(3), reraise=True)
@@ -388,11 +493,27 @@ class RouterNode(Executor):
 
     @handler
     async def route(self, state: PMOState, ctx: WorkflowContext[RoutedMessage]) -> None:
+        if (
+            state.wake_reason == "event_bus"
+            and state.proactive_target
+            and state.proactive_target != "change_control_clerk"
+        ):
+            decision = TriageRouterDecision(
+                next_node=state.proactive_target,  # type: ignore[arg-type]
+                reasoning=f"event_bus subscription woke {state.proactive_target}",
+                update_vague_turns=False,
+                wake_reason="event_bus",
+            )
+            cleared = state.model_copy(update={"wake_reason": None, "proactive_target": None})
+            await ctx.send_message(RoutedMessage(state=cleared, decision=decision))
+            return
+
         user_message = state.message_history[-1].get("content", "") if state.message_history else ""
         prompt = _render_prompt(
             user_name=state.user_id,
             channel_type="teams",
             vague_turns=state.vague_turns,
+            event_digest=_event_digest(state),
         )
 
         try:
@@ -400,6 +521,9 @@ class RouterNode(Executor):
         except Exception as exc:  # noqa: BLE001 - Token Loop Breaker exhausted; route, don't crash the graph
             await ctx.send_message(RoutedMessage(state=state, failed=True, error=str(exc)))
             return
+
+        if decision.next_node == "change_control_clerk" and decision.wake_reason == "event_bus":
+            decision = decision.model_copy(update={"next_node": "end_conversation"})
 
         new_vague_turns = state.vague_turns + 1 if decision.update_vague_turns else 0
         updated_state = state.model_copy(update={"vague_turns": new_vague_turns})
@@ -441,11 +565,15 @@ class PendingVetoRequest(BaseModel):
     Carries everything an external system (a Teams bot handler, or today,
     a human operator driving `simulate_teams_webhook.py`) needs to post the
     Adaptive Card and, later, resume the paused workflow.
+
+    `state` is the clerk-updated PMOState (including event_bus) so a sibling
+    proactive run can proceed without resuming this veto checkpoint.
     """
 
     checkpoint_id: str
     request_id: str
     card: dict
+    state: Optional[PMOState] = None
 
 
 class ChangeControlClerk(Executor):
@@ -479,6 +607,22 @@ class ChangeControlClerk(Executor):
             return
 
         updated_state = message.state.model_copy(update={"requires_pm_veto": True, "pending_change": payload})
+        updated_state = _publish(
+            updated_state,
+            BlackboardEvent(
+                event_type=EventType.BASELINE_SLIP_REQUESTED,
+                publisher="change_control_clerk",
+                project_id=updated_state.project_id,
+                correlation_id=payload.change_id,
+                payload={
+                    "change_id": payload.change_id,
+                    "target_table": payload.target_table,
+                    "record_id": payload.record_id,
+                    "proposed_values": payload.proposed_values,
+                    "field_delta_assessment": payload.prince2_impact_assessment,
+                },
+            ),
+        )
         await ctx.send_message(
             ChangeControlOutput(
                 state=updated_state,
@@ -561,6 +705,22 @@ class BaselineCommitNode(Executor):
     async def commit(self, message: BaselineCommitInput, ctx: WorkflowContext[Never, dict]) -> None:
         cleared_state = message.state.model_copy(
             update={"requires_pm_veto": False, "pending_change": None, "pm_veto_decision": None}
+        )
+
+        decision_event_type = (
+            EventType.BASELINE_CHANGE_APPROVED
+            if message.state.pm_veto_decision == "approved"
+            else EventType.BASELINE_CHANGE_REJECTED
+        )
+        cleared_state = _publish(
+            cleared_state,
+            BlackboardEvent(
+                event_type=decision_event_type,
+                publisher="baseline_commit_node",
+                project_id=cleared_state.project_id,
+                correlation_id=message.pending_change.change_id,
+                payload={"change_id": message.pending_change.change_id, "decision": message.state.pm_veto_decision},
+            ),
         )
 
         if message.state.pm_veto_decision == "approved":
@@ -685,11 +845,32 @@ class StateWritebackNode(Executor):
         risk = state.latest_risk_escalation
 
         if risk is not None and risk.prince2_exception_triggered:
+            exception_id = str(uuid4())
+            state = _publish(
+                state,
+                BlackboardEvent(
+                    event_type=EventType.TOLERANCE_BREACHED,
+                    publisher="state_writeback_node",
+                    project_id=state.project_id,
+                    correlation_id=exception_id,
+                    payload={"risk_category": risk.risk_category, "severity": risk.severity},
+                ),
+            )
+            state = _publish(
+                state,
+                BlackboardEvent(
+                    event_type=EventType.EXCEPTION_SUSPENDED,
+                    publisher="state_writeback_node",
+                    project_id=state.project_id,
+                    correlation_id=exception_id,
+                    payload={"exception_id": exception_id},
+                ),
+            )
             await ctx.send_message(
                 ExceptionInterruptOutput(
                     state=state,
                     worker_output=message.worker_output,
-                    exception_id=str(uuid4()),
+                    exception_id=exception_id,
                 )
             )
             return
@@ -850,6 +1031,12 @@ class PMPWorker(Executor):
             _PMP_PROMPT_PATH,
             user_message=user_message,
             extracted_entities=message.decision.extracted_entities if message.decision else None,
+            wake_reason=(
+                message.decision.wake_reason
+                if message.decision and message.decision.wake_reason
+                else message.state.wake_reason or "user_message"
+            ),
+            event_digest=_event_digest(message.state),
         )
         try:
             payload = await _get_worker_payload(self._chat_agent, prompt, TaskProgressPayload, worker_name="PMP Worker")
@@ -860,6 +1047,32 @@ class PMPWorker(Executor):
             return
 
         updated_state = message.state.model_copy(update={"latest_task_progress": payload})
+        updated_state = _publish(
+            updated_state,
+            BlackboardEvent(
+                event_type=EventType.TASK_PROGRESS_LOGGED,
+                publisher="pmp_worker",
+                project_id=updated_state.project_id,
+                correlation_id=payload.task_id,
+                payload={
+                    "task_id": payload.task_id,
+                    "percent_complete": payload.percent_complete,
+                    "actual_hours_spent": payload.actual_hours_spent,
+                    "is_critical_path": payload.is_critical_path,
+                },
+            ),
+        )
+        if payload.is_critical_path and payload.percent_complete < 100:
+            updated_state = _publish(
+                updated_state,
+                BlackboardEvent(
+                    event_type=EventType.CRITICAL_PATH_SLIPPED,
+                    publisher="pmp_worker",
+                    project_id=updated_state.project_id,
+                    correlation_id=payload.task_id,
+                    payload={"task_id": payload.task_id, "percent_complete": payload.percent_complete},
+                ),
+            )
         # Phase 6: no longer terminal -- state_writeback_node commits this
         # payload to the DB and clears it before the turn actually ends.
         await ctx.send_message(
@@ -894,6 +1107,12 @@ class AgileWorker(Executor):
             _AGILE_PROMPT_PATH,
             user_message=user_message,
             extracted_entities=message.decision.extracted_entities if message.decision else None,
+            wake_reason=(
+                message.decision.wake_reason
+                if message.decision and message.decision.wake_reason
+                else message.state.wake_reason or "user_message"
+            ),
+            event_digest=_event_digest(message.state),
         )
         try:
             payload = await _get_worker_payload(self._chat_agent, prompt, BlockerPayload, worker_name="Agile Worker")
@@ -904,6 +1123,20 @@ class AgileWorker(Executor):
             return
 
         updated_state = message.state.model_copy(update={"latest_blocker": payload})
+        updated_state = _publish(
+            updated_state,
+            BlackboardEvent(
+                event_type=EventType.BLOCKER_LOGGED,
+                publisher="agile_worker",
+                project_id=updated_state.project_id,
+                correlation_id=payload.task_id,
+                payload={
+                    "task_id": payload.task_id,
+                    "blocker_description": payload.blocker_description,
+                    "requires_cross_team_help": payload.requires_cross_team_help,
+                },
+            ),
+        )
         # Phase 6: no longer terminal -- state_writeback_node commits this
         # payload to the DB and clears it before the turn actually ends.
         await ctx.send_message(
@@ -942,6 +1175,12 @@ class GovernanceWorker(Executor):
             _GOVERNANCE_PROMPT_PATH,
             user_message=user_message,
             extracted_entities=message.decision.extracted_entities if message.decision else None,
+            wake_reason=(
+                message.decision.wake_reason
+                if message.decision and message.decision.wake_reason
+                else message.state.wake_reason or "user_message"
+            ),
+            event_digest=_event_digest(message.state),
         )
         try:
             payload = await _get_worker_payload(
@@ -954,6 +1193,21 @@ class GovernanceWorker(Executor):
             return
 
         updated_state = message.state.model_copy(update={"latest_risk_escalation": payload})
+        updated_state = _publish(
+            updated_state,
+            BlackboardEvent(
+                event_type=EventType.RISK_FLAGGED,
+                publisher="governance_worker",
+                project_id=updated_state.project_id,
+                correlation_id=payload.risk_category,
+                payload={
+                    "risk_category": payload.risk_category,
+                    "severity": payload.severity,
+                    "description": payload.description,
+                    "prince2_exception_triggered": payload.prince2_exception_triggered,
+                },
+            ),
+        )
         # Phase 6: no longer terminal -- state_writeback_node either commits
         # this payload directly or, if it breaches PRINCE2 tolerance, routes
         # to the Exception Interrupt before committing.
@@ -1091,11 +1345,7 @@ def build_app_graph(
             # must be unique, so this single Case covers both triggers; the
             # `vague_turns >= 2` half is evaluated first and overrides whatever
             # `next_node` the LLM picked, exactly as required.
-            Case(
-                condition=lambda msg: msg.state.vague_turns >= 2
-                or (msg.decision is not None and msg.decision.next_node == "escalation_node"),
-                target=escalation,
-            ),
+            Case(condition=friction_breaker_fires, target=escalation),
             Case(condition=lambda msg: msg.decision.next_node == "pmp_worker", target=pmp),
             Case(condition=lambda msg: msg.decision.next_node == "agile_worker", target=agile),
             Case(condition=lambda msg: msg.decision.next_node == "governance_worker", target=governance),
@@ -1154,6 +1404,7 @@ async def run_turn(
                 checkpoint_id=checkpoint.checkpoint_id if checkpoint else "",
                 request_id=request_event.request_id,
                 card=render_pm_veto_card(pending_data.pending_change),
+                state=pending_data.state,
             )
         if isinstance(pending_data, ExceptionInterruptOutput):
             return PendingExceptionRequest(
@@ -1203,6 +1454,50 @@ async def resume_after_exception(
     events = await workflow.run(checkpoint_id=checkpoint_id, responses={request_id: decision})
     outputs = events.get_outputs()
     return outputs[0] if outputs else None
+
+
+async def maybe_run_proactive_followup(
+    workflow: Any,
+    state: PMOState,
+    *,
+    checkpoint_storage: Optional[CheckpointStorage] = None,
+) -> Any:
+    """Sibling graph run: wake one subscribed specialist from an unread event.
+
+    Does not resume a paused veto checkpoint. Does not target change_control_clerk.
+    At most one wake per call (loop breaker).
+    """
+    if not state.event_bus:
+        loaded = _load_unread_events(state.project_id)
+        if loaded:
+            state = state.model_copy(update={"event_bus": loaded})
+
+    match = next_proactive_target(state)
+    if match is None:
+        return None
+    event, target = match
+    if target == "change_control_clerk":
+        return None
+
+    woken = mark_event_consumed(state, event.event_id, target)
+    persist_blackboard_event(next(e for e in woken.event_bus if e.event_id == event.event_id))
+    wake_state = woken.model_copy(
+        update={
+            "wake_reason": "event_bus",
+            "proactive_target": target,
+            "message_history": [
+                *woken.message_history,
+                {
+                    "role": "system",
+                    "content": (
+                        f"Proactive event-bus wake: {event.event_type.value} "
+                        f"correlation={event.correlation_id}. Do not draft or authorize baseline changes."
+                    ),
+                },
+            ],
+        }
+    )
+    return await run_turn(workflow, wake_state, checkpoint_storage=checkpoint_storage)
 
 
 def build_default_router_chat_agent(*, temperature: float = 0.30) -> Agent:

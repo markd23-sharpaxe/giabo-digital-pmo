@@ -1,0 +1,153 @@
+[
+  {
+    "id": "redundant-chase-fatigue-4h",
+    "name": "Redundant chase suppression",
+    "description": "Task contacted 4 hours ago. The 24h fatigue window must force chasing_score 0.0 and suppress_chase even when critical-path impact is high.",
+    "input": {
+      "project_id": "22222222-2222-2222-2222-222222222222",
+      "tasks": [
+        {
+          "task_id": "TSK-FATIGUE-4H",
+          "assignee": "Sarah (Backend)",
+          "task_name": "API Gateway Migration",
+          "hours_since_last_contact": 4,
+          "days_to_deadline": 5,
+          "critical_path_impact": 9,
+          "linked_risks_severity": 8
+        }
+      ]
+    },
+    "expected": {
+      "shouldChase": false,
+      "expectedAction": "suppress_chase",
+      "expectedTool": "suppress_chase",
+      "expectedRankedTaskIds": [],
+      "expectedChasingScores": {
+        "TSK-FATIGUE-4H": 0.0
+      }
+    }
+  },
+  {
+    "id": "priority-conflict-proximity-vs-impact",
+    "name": "Priority conflict with multiple tasks",
+    "description": "Task A is due in 5 days with impact 2; Task B is due in 1 day with impact 9. Both are outside the fatigue window. Proximity weighting must rank B strictly above A.",
+    "input": {
+      "project_id": "22222222-2222-2222-2222-222222222222",
+      "tasks": [
+        {
+          "task_id": "TSK-A",
+          "assignee": "Priya (Platform)",
+          "task_name": "Docs site refresh",
+          "hours_since_last_contact": 48,
+          "days_to_deadline": 5,
+          "critical_path_impact": 2,
+          "linked_risks_severity": 2
+        },
+        {
+          "task_id": "TSK-B",
+          "assignee": "Jonah (Infra)",
+          "task_name": "Cut over production DNS",
+          "hours_since_last_contact": 48,
+          "days_to_deadline": 1,
+          "critical_path_impact": 9,
+          "linked_risks_severity": 8
+        }
+      ]
+    },
+    "expected": {
+      "shouldChase": true,
+      "expectedAction": "send_teams_chase",
+      "expectedTool": "send_teams_chase",
+      "expectedRankedTaskIds": ["TSK-B", "TSK-A"],
+      "expectedChasingScores": {
+        "TSK-A": 27.0,
+        "TSK-B": 207.9
+      }
+    }
+  },
+  {
+    "id": "fatigue-expired-high-proximity",
+    "name": "Maximum fatigue expiration and high proximity",
+    "description": "Last contact 30 hours ago (fatigue expired), due tomorrow, critical impact 10 and risk 10. Must chase with the high proximity-weighted score 243.0.",
+    "input": {
+      "project_id": "22222222-2222-2222-2222-222222222222",
+      "tasks": [
+        {
+          "task_id": "TSK-CRITICAL-TOMORROW",
+          "assignee": "Alex (Payments)",
+          "task_name": "PCI evidence pack for go-live",
+          "hours_since_last_contact": 30,
+          "days_to_deadline": 1,
+          "critical_path_impact": 10,
+          "linked_risks_severity": 10
+        }
+      ]
+    },
+    "expected": {
+      "shouldChase": true,
+      "expectedAction": "send_teams_chase",
+      "expectedTool": "send_teams_chase",
+      "expectedRankedTaskIds": ["TSK-CRITICAL-TOMORROW"],
+      "expectedChasingScores": {
+        "TSK-CRITICAL-TOMORROW": 243.0
+      }
+    }
+  },
+  {
+    "id": "floor-priority-far-deadline",
+    "name": "Low priority zero-impact edge case",
+    "description": "Due in 30 days with the floor weights (impact 1, risk 1). Non-fatigue minimum score is 2.7. Eval invariant: suppress_chase rather than spend chase budget on floor-priority work.",
+    "input": {
+      "project_id": "22222222-2222-2222-2222-222222222222",
+      "tasks": [
+        {
+          "task_id": "TSK-FLOOR",
+          "assignee": "Mina (Design)",
+          "task_name": "Iconography tidy-up",
+          "hours_since_last_contact": 48,
+          "days_to_deadline": 30,
+          "critical_path_impact": 1,
+          "linked_risks_severity": 1
+        }
+      ]
+    },
+    "expected": {
+      "shouldChase": false,
+      "expectedAction": "suppress_chase",
+      "expectedTool": "suppress_chase",
+      "expectedRankedTaskIds": [],
+      "expectedChasingScores": {
+        "TSK-FLOOR": 2.7
+      }
+    }
+  },
+  {
+    "id": "quiet-update-resets-fatigue",
+    "name": "Quiet update / recent manual interaction",
+    "description": "Assignee replied 12 hours ago that they are working on it. last_contact reset must re-enter the 24h fatigue window and suppress_chase.",
+    "input": {
+      "project_id": "22222222-2222-2222-2222-222222222222",
+      "tasks": [
+        {
+          "task_id": "TSK-QUIET-UPDATE",
+          "assignee": "Chris (QA)",
+          "task_name": "Regression pack for release 12",
+          "hours_since_last_contact": 12,
+          "days_to_deadline": 3,
+          "critical_path_impact": 7,
+          "linked_risks_severity": 6,
+          "last_assignee_message": "I'm working on it — regression pack is in progress and I'll have the first pass by tomorrow."
+        }
+      ]
+    },
+    "expected": {
+      "shouldChase": false,
+      "expectedAction": "suppress_chase",
+      "expectedTool": "suppress_chase",
+      "expectedRankedTaskIds": [],
+      "expectedChasingScores": {
+        "TSK-QUIET-UPDATE": 0.0
+      }
+    }
+  }
+]

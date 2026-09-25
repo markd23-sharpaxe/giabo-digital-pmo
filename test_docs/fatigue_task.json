@@ -1,0 +1,9 @@
+{
+  "task_id": "TSK-FATIGUE",
+  "assignee": "Sarah (Backend)",
+  "task_name": "API Gateway Migration",
+  "critical_path_impact": 9,
+  "linked_risks_severity": 8,
+  "hours_since_last_contact": 2,
+  "days_to_deadline": 5
+}

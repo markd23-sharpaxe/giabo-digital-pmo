@@ -155,10 +155,10 @@ class Tenant(Base):
     # Generated column, read-only from the ORM side; mirrors schema.sql exactly.
     trial_end_date: Mapped[Optional[date]] = mapped_column(Date, Computed("trial_start_date + 14", persisted=True))
 
-    # Generated column derived from plan_tier ($20 trial / $350 paid) -- read-only.
+    # Generated column -- Monthly Free Plan has no included allowance.
     monthly_token_allowance_usd: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(10, 2),
-        Computed("CASE WHEN plan_tier = 'paid_monthly' THEN 350.00 ELSE 20.00 END", persisted=True),
+        Computed("0.00", persisted=True),
     )
 
     raw_token_spend_usd: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False, default=Decimal("0"))
@@ -450,8 +450,8 @@ class TokenLedgerEntry(Base):
     total_tokens: Mapped[Optional[int]] = mapped_column(Computed("prompt_tokens + completion_tokens", persisted=True))
 
     raw_cost_usd: Mapped[Decimal] = mapped_column(Numeric(12, 6), nullable=False)
-    # 3x overage multiplier once a paid_monthly tenant exceeds the $350 allowance.
-    overage_multiplier: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False, default=Decimal("1.00"))
+    # 2.50x Marketplace metered markup on every call ($1.00 billed per $0.40 raw).
+    overage_multiplier: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False, default=Decimal("2.50"))
     # Generated column, read-only from the ORM side; mirrors schema.sql exactly.
     billable_cost_usd: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(12, 6), Computed("raw_cost_usd * overage_multiplier", persisted=True)
@@ -479,8 +479,47 @@ class TokenLedgerEntry(Base):
     )
 
 
-# =============================================================================
-# 3. PYDANTIC V2 SCHEMAS
+class EvalAuditLog(Base):
+    """LLM-as-a-judge eval run row (tests/evals runners)."""
+
+    __tablename__ = "eval_audit_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    suite: Mapped[str] = mapped_column(Text, nullable=False)
+    scenario_id: Mapped[str] = mapped_column(Text, nullable=False)
+    target_agent_role: Mapped[Optional[str]] = mapped_column(Text)
+    originating_rule: Mapped[Optional[str]] = mapped_column(Text)
+    pass_: Mapped[bool] = mapped_column("pass", nullable=False)
+    score: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    reasoning_coherence: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    context_retention: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    tool_selection_correctness: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    justification: Mapped[str] = mapped_column(Text, nullable=False)
+    actual_tool: Mapped[Optional[str]] = mapped_column(Text)
+    gold_expected: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
+    reasoning_trace: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    tool_log: Mapped[Any] = mapped_column(JSONB, nullable=False)
+    judge_verdict: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    model_deployment: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EventBusRow(Base):
+    """Append-only blackboard event (maf_graph_state.BlackboardEvent)."""
+
+    __tablename__ = "event_bus"
+
+    event_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    project_id: Mapped[str] = mapped_column(Text, nullable=False)
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    publisher: Mapped[str] = mapped_column(Text, nullable=False)
+    correlation_id: Mapped[Optional[str]] = mapped_column(Text)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    consumed_by: Mapped[Any] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 #
 # Convention per entity: `<Entity>Base` (shared fields) -> `<Entity>Create`
 # (input payload) -> `<Entity>Read` (output payload, adds server-owned fields
@@ -672,7 +711,7 @@ class TokenLedgerEntryBase(BaseModel):
     prompt_tokens: int = Field(ge=0, default=0)
     completion_tokens: int = Field(ge=0, default=0)
     raw_cost_usd: Decimal = Field(ge=0)
-    overage_multiplier: Decimal = Field(ge=Decimal("1.00"), default=Decimal("1.00"))
+    overage_multiplier: Decimal = Field(ge=Decimal("1.00"), default=Decimal("2.50"))
     is_overage: bool = False
 
 
