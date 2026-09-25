@@ -1,3 +1,18 @@
 ---
-alwaysApply: true
+description: Azure Marketplace billing gates, token consumption tracking, 14-day trial halts, and 3x overage metering.
+globs: ["*billing*.py", "*gates*.py", "*metering*.py", "*tenant*.py"]
 ---
+
+# Azure Marketplace Billing & Token Metering Architecture
+
+All MAF agent node executions MUST pass through sequential billing and token verification gates before invoking any Azure OpenAI model.
+
+## 1. Plan Definitions & Thresholds
+*   **Free / Trial Plan (`free_trial`):** $20.00 USD token allowance, 14-day limit. Hard halt (`swarm_status = "trial_expired"`) when exceeded.
+*   **Paid Plan (`paid_monthly`):** $999.00/month. $350.00 USD monthly token allowance.
+*   **Overage Rate:** $3.00 billed per $1.00 raw token spend exceeding $350.00 (3x multiplier).
+
+## 2. Metering & Protection
+*   Atomic cost accumulation in PostgreSQL using `SELECT FOR UPDATE`.
+*   Emit overage to Azure Marketplace Metering API.
+*   Support `process.env.SWARM_ALL_AGENTS_ENABLED` override for internal test environments.

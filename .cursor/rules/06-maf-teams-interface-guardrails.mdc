@@ -1,3 +1,17 @@
 ---
-alwaysApply: true
+description: Microsoft Teams interaction modes, bot framework rules, and systemic circuit breakers.
+globs: ["*teams*.py", "*bot*.py", "*interface*.py", "*guardrails*.py", "*middleware*.py"]
 ---
+
+# Teams Interface & System Guardrails
+
+## 1. The 4 Teams Interaction Modes
+*   **Comprehensive Q&A:** Synchronous 200 OK ACK ("Looking into that...") + Asynchronous synthesized answer.
+*   **Conversational Data Gathering:** Read/Write capability via native mutation tools.
+*   **New Item Notifications:** Mentions MUST use Bot Framework `<at>` tags mapped to Entra ID.
+*   **Contextual Chasing:** Idempotent chasing with a 24-hour cooldown per item.
+
+## 2. Critical Circuit Breakers
+*   **Friction Circuit Breaker:** 2-turn limit on vague/evasive human responses before graceful exit and PM escalation.
+*   **Token Loop Limit:** Maximum 3 schema self-correction attempts before hard fail.
+*   **PM Veto:** No automated status report pushes without human authorization.

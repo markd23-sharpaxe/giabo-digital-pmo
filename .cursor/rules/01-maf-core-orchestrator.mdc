@@ -1,3 +1,14 @@
 ---
+description: Core Microsoft Agent Framework routing and GIABO orchestrator mapping.
+globs: ["*orchestrator*.py", "*dispatcher*.py", "*graph*.py", "*workflow*.py", "main.py"]
 alwaysApply: true
 ---
+
+# MAF Core Orchestrator Architecture
+
+## The GIABO to MAF Migration Standard
+We are migrating a custom Replit 2-stage pipeline into a Microsoft Agent Framework (MAF) directed graph.
+*   **Routing:** The SharePoint delta is injected into the MAF State. A Router Node evaluates the state and uses conditional Edges to route the delta to the correct Specialist Agent Nodes.
+*   **State Management:** Define a typed State object that holds the `delta_payload`, `active_agent_roster`, and an array of `outputs`.
+*   **Excluded Agents:** The Router Node must NEVER see `DELTA_DISPATCH_EXCLUDED_AGENTS` (e.g., `governance_auditor`). Strip these from the roster before injecting into the state.
+*   **Parallel Execution:** Use MAF's parallel node execution for specialist dispatch.

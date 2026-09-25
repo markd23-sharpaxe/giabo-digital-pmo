@@ -1,3 +1,12 @@
 ---
-alwaysApply: true
+description: Governance Auditor and Synthetic Cron Keys.
+globs: ["*cron*.py", "*governance*.py", "*auditor*.py"]
 ---
+
+# Cron & Governance Sweep
+
+These components bypass the orchestrator graph and run deterministically on schedule.
+
+1. **Governance Auditor:** Daily sweep verifying PID on file, stated objectives, unowned open actions, orphaned actions, and stage boundaries.
+2. **EOM Financial Checkpoint:** Monthly cost tolerance check. Fires last Friday of the month. Raises deterministic action (`ACTION-EOM-{hash}-{yyyy-mm}`).
+3. **Sprint Boundary Watchdog:** Queries Active sprints whose `endDate` has passed. Raises deterministic action (`ACTION-SPRINT-OVERDUE-{hash}`).

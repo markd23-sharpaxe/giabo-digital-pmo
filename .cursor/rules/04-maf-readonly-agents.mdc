@@ -1,3 +1,15 @@
 ---
-alwaysApply: true
+description: Specifications for Read-only reporting and analysis agents.
+globs: ["*agents/readonly*.py", "*plugins/readonly*.py", "*reports*.py"]
 ---
+
+# Read-Only Agent Specifications
+
+These agents perform analysis and append findings to Graph State or Status Report cycles without triggering raw artifact write-backs.
+
+*   **Forensic Alignment Engine (Temp 0.10):** Semantic cross-check between Goals and Scope using Zero-Assumption Directive.
+*   **Earned Value Analyst (Temp 0.10):** Computes CPI, SPI, CV, SV, EAC. Flags breaches (< 0.85).
+*   **Governance Synthesizer (Temp 0.20):** Consolidates technical state into executive governance tiers.
+*   **Stage Gate Guardian (Temp 0.10):** Binary PASS/FAIL verdict per gate with outstanding items.
+*   **Project Health Reporter (Temp 0.20):** Synthesises all signals into a unified RAG status report.
+*   **PM Veto Highlight Report Tool:** Reactive report generator called exclusively on explicit PM command.

@@ -1,3 +1,16 @@
 ---
-alwaysApply: true
+description: The Tri-Framework PM persona (PRINCE2, PMP, Agile) and dynamic, AI-driven task chasing logic.
+globs: ["*chaser*.py", "*persona*.py", "*tracker*.py", "*dynamic*.py", "*prompts*.py"]
 ---
+
+# Tri-Framework Expert Persona & Dynamic Chasing
+
+## 1. The Tri-Framework PM Persona
+Synthesizes PRINCE2 (governance & exception thresholds), PMP (critical path & schedule rigor), and Agile (servant-leadership & adaptive collaboration).
+
+## 2. Dynamic Chasing Protocol
+Chasing frequency is dynamically calculated via a `ChasingRationale` object evaluating:
+1.  **Critical Path Impact:** Proactive outreach on key predecessor items.
+2.  **Risk & Complexity:** Tracking mitigation progress for high-severity linked risks.
+3.  **Human Context & Fatigue:** 24-hour cooldown and multi-task batching.
+4.  **Proximity & RAG Status:** Green (trust), Amber (supportive check-in), Red (exception escalation).

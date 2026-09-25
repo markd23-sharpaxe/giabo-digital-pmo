@@ -1,3 +1,15 @@
 ---
-alwaysApply: true
+description: Standard Operating Procedure (SOP) for the Digital PMO Agent Swarm operating model.
+globs: ["*sop*.py", "*orchestrator*.py", "*lifecycle*.py", "*pmo*.py", "*pipeline*.py"]
 ---
+
+# Digital PMO Swarm: Standard Operating Procedure (SOP)
+
+## 1. Ingestion Lifecycle Branches
+*   **Initiation Phase (Cold Start):** Full site ingestion $\rightarrow$ baseline extraction $\rightarrow$ Golden Thread alignment check $\rightarrow$ proactive gap action generation (e.g., raise action to PM if no risks exist).
+*   **Steady-State Monitoring:** Delta ingestion $\rightarrow$ impact assessment $\rightarrow$ schedule float recalculation $\rightarrow$ exception escalation.
+
+## 2. Multi-Channel Execution
+*   Manage project logs in PostgreSQL.
+*   Communicate with team members via Microsoft Teams and Outlook.
+*   Proactively notify task owners prior to critical milestone deadlines.

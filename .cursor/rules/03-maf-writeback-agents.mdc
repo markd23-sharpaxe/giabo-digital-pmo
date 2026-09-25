@@ -1,3 +1,16 @@
 ---
-alwaysApply: true
+description: Specifications for Write-back eligible agents that mutate project state.
+globs: ["*agents/writeback*.py", "*plugins/writeback*.py", "*tools/writeback*.py"]
 ---
+
+# Write-Back Agent Specifications
+
+These agents generate artifacts that mutate project state via direct MAF native database tools.
+
+1. **PRINCE2 Exception Master (Pilot Allowed):** Tolerance monitoring and Exception Reports. Scope: `decisions`. (Temp: 0.10)
+2. **RAID & Compliance Auto-Chaser (Pilot Allowed):** RAID gap detection and action creation. Scope: `assumptionsIssues`, `actions`. (Temp: 0.30)
+3. **Risk Radar Monitor (Standard Tier):** Scans for risk signals. Scope: `risks`, `dependencies`. (Temp: 0.20)
+4. **Change Control Clerk (Pilot Allowed):** Change Request management with write-override authority on baselines. Scope: `changes`. (Temp: 0.15)
+5. **Lessons Learned Curator (Pilot Allowed):** Retrospective insight extraction. Scope: `lessons`. (Temp: 0.30)
+6. **Dependency Map Maintainer (Pilot Allowed):** Cross-project dependency tracking. Scope: `dependencies`. (Temp: 0.15)
+7. **Scrum Master Liaison (Standard Tier):** Sprint log lifecycle management. Scope: `sprints`. (Temp: 0.15)
