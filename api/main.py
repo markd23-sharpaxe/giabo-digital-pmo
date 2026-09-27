@@ -71,6 +71,7 @@ from botbuilder.integration.aiohttp import CloudAdapter, ConfigurationBotFramewo
 from botbuilder.schema import Activity, ActivityTypes
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -296,6 +297,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Azure terminates TLS. Without this, url_for() emits http:// links and the
+# browser blocks theme.css as mixed content on https://rapidviableproduct.ai.
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -308,10 +312,10 @@ async def root(request: Request) -> HTMLResponse:
 
 # Public marketing homepage, Agent Handbook, Marketplace landing, and legal
 # pages all share `static/css/theme.css` and `static/images/logo.png`.
-# Mounted by absolute path so `/static` resolves on Azure even when the
-# process cwd is not the repo root.
-_STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
-app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+# Absolute path so Azure App Service does not depend on the process cwd.
+base_dir = os.path.dirname(os.path.abspath(__file__))
+static_dir = os.path.join(os.path.dirname(base_dir), "static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Microsoft 365 Copilot Declarative Agent API Bridge: POST
 # /api/projects/create, GET /api/projects/{projectId}/brief, GET
