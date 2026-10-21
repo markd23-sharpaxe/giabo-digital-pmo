@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}About Us -- Rapid Viable Product AI{% endblock %}
+{% block meta_description %}Rapid Viable Product AI builds deterministic, enterprise-ready AI agents and strategic consultancy for strict project governance.{% endblock %}
+
+{% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  .about-page { font-family: Inter, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .about-page h1, .about-page h2, .about-page h3 { font-family: "Space Grotesk", Inter, sans-serif; }
+</style>
+{% endblock %}
+
+{% block content %}
+<article class="about-page mx-auto max-w-4xl px-5 py-14 sm:px-6 sm:py-20">
+  <header class="border-b border-slate-800 pb-12">
+    <h1 class="text-white">Moving Project Management from Typist to Chief of Staff</h1>
+    <p class="mt-5 max-w-3xl text-lg leading-relaxed text-slate-300">
+      Rapid Viable Product AI builds deterministic, enterprise-ready AI agents and provides strategic consultancy to execute strict project governance—so you can focus on strategy.
+    </p>
+  </header>
+
+  <section class="border-b border-slate-800 py-12" aria-labelledby="philosophy-heading">
+    <h2 id="philosophy-heading">Our Philosophy: Human-in-Control</h2>
+    <div class="space-y-4 text-base leading-relaxed text-slate-300">
+      <p>The era of the AI 'copilot' that merely summarizes meeting notes is over. Intelligence is a commodity; deterministic execution is the differentiator.</p>
+      <p>At Rapid Viable Product AI, we believe enterprise project managers need systems that respect professional constraints, not just smarter chat windows. We build multi-agent swarms that apply objective reasoning to complex deliverables, eliminating administrative overhead while keeping the human firmly in control of the rules and the environment.</p>
+    </div>
+  </section>
+
+  <section class="border-b border-slate-800 py-12" aria-labelledby="offerings-heading">
+    <h2 id="offerings-heading">What We Do</h2>
+    <div class="mt-6 grid gap-4 md:grid-cols-3">
+      <section class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+        <h3 class="text-lg text-white">Digital Employees &amp; AI Agents</h3>
+        <p class="mt-3 text-sm leading-relaxed text-slate-300">We build custom, deterministic AI swarms utilizing our proprietary GIARO framework (Goals, Inputs, Actions, Reasoning, Outputs). These agents route chaotic corporate data into hardened, standardized PMO artifacts like RAID logs and status reports.</p>
+      </section>
+      <section class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+        <h3 class="text-lg text-white">AI Project Management Consultancy</h3>
+        <p class="mt-3 text-sm leading-relaxed text-slate-300">We partner with enterprise PMOs to audit existing workflows and implement pragmatic AI strategies that unblock team capacity and enforce objective project outcomes.</p>
+      </section>
+      <section class="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+        <h3 class="text-lg text-white">Keynotes &amp; Industry Talks</h3>
+        <p class="mt-3 text-sm leading-relaxed text-slate-300">We deliver high-impact presentations and live technical demonstrations on the future of Agentic Project Management, showing audiences how to move beyond raw large language models into structured, governed execution.</p>
+      </section>
+    </div>
+  </section>
+
+  <section class="border-b border-slate-800 py-12" aria-labelledby="founder-heading">
+    <h2 id="founder-heading">The Founder</h2>
+    <p class="text-base font-medium text-white">Mark Durnin, Managing Director &amp; Founder</p>
+    <div class="mt-4 space-y-4 text-base leading-relaxed text-slate-300">
+      <p>With over two decades of experience in complex enterprise project delivery, program governance, and organizational transformation, Mark bridges the gap between high-level strategic oversight and hands-on technical execution.</p>
+      <p>Mark has spent his career controlling complex delivery schedules and data migrations for global organizations. Rapid Viable Product AI was founded on his pragmatic, builder-first approach to solving structural inefficiencies. By combining behavioral economics with deterministic prompt orchestration, Mark develops systems that remove administrative friction and drive clear, objective results.</p>
+    </div>
+  </section>
+
+  <section class="py-12" aria-labelledby="waitlist-heading">
+    <div class="rounded-2xl border border-indigo-400/40 bg-slate-950/80 p-6 shadow-[0_0_40px_rgba(99,102,241,0.18)] sm:p-8">
+      <h2 id="waitlist-heading">Join the Waitlist: The PMO Digital Employee</h2>
+      <p class="mt-3 leading-relaxed text-slate-300">We are currently finalizing our first commercially available PMO Digital Employee—a ready-to-deploy agent swarm pre-configured with the GIARO framework to handle RAID triage and project governance right out of the box. Sign up to get early access, exclusive development updates, and priority onboarding when we launch.</p>
+      <form id="waitlist-form" class="mt-6" novalidate>
+        <label for="waitlist-email" class="mb-2 block text-sm font-medium text-slate-200">Work email</label>
+        <div class="flex flex-col gap-3 sm:flex-row">
+          <input id="waitlist-email" name="email" type="email" autocomplete="email" required placeholder="Enter your work email" aria-describedby="waitlist-error" class="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40">
+          <button type="submit" class="shrink-0 rounded-xl bg-indigo-500 px-5 py-3 font-semibold text-white hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300">Get Early Access</button>
+        </div>
+        <p id="waitlist-error" class="mt-2 hidden text-sm text-rose-300" role="alert"></p>
+      </form>
+      <p id="waitlist-success" class="mt-6 hidden text-base text-emerald-300" role="status">You're on the list. We'll send early access and development updates to this address.</p>
+    </div>
+  </section>
+
+  <section class="border-t border-slate-800 pt-12" aria-labelledby="contact-heading">
+    <h2 id="contact-heading">Get in Touch</h2>
+    <p class="max-w-3xl leading-relaxed text-slate-300">Whether you want to explore implementing a deterministic agent swarm, book a keynote for your next event, or discuss AI PMO consultancy, let's talk.</p>
+    <ul class="mt-6 space-y-3 text-slate-200">
+      <li>
+        <a class="inline-flex items-center gap-3" href="mailto:mark@rapidviableproduct.ai">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="h-5 w-5 text-indigo-300" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/></svg>
+          <span>mark@rapidviableproduct.ai</span>
+        </a>
+      </li>
+      <li>
+        <a class="inline-flex items-center gap-3" href="https://www.linkedin.com/company/110387643/" target="_blank" rel="noopener noreferrer">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="h-5 w-5 text-indigo-300" fill="currentColor"><path d="M6.5 9H4V20h2.5V9zM5.2 4A1.6 1.6 0 1 0 5.2 7.2 1.6 1.6 0 0 0 5.2 4zM20 20h-2.5v-5.6c0-1.6-.6-2.6-2-2.6-1 0-1.6.7-1.9 1.4-.1.2-.1.6-.1.9V20H11V9h2.4v1.5c.4-.7 1.3-1.8 3.2-1.8 2.3 0 4 1.5 4 4.8V20z"/></svg>
+          <span>LinkedIn</span>
+        </a>
+      </li>
+    </ul>
+  </section>
+</article>
+<script>
+  // Wire submitWaitlist to Supabase, Resend, or Formspree when a list endpoint exists.
+  function submitWaitlist(email) {
+    return email;
+  }
+
+  const waitlistForm = document.getElementById("waitlist-form");
+  const waitlistEmail = document.getElementById("waitlist-email");
+  const waitlistError = document.getElementById("waitlist-error");
+  const waitlistSuccess = document.getElementById("waitlist-success");
+
+  waitlistForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    const email = waitlistEmail.value.trim();
+    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!valid) {
+      waitlistError.textContent = "Enter a valid work email.";
+      waitlistError.classList.remove("hidden");
+      waitlistEmail.setAttribute("aria-invalid", "true");
+      waitlistEmail.focus();
+      return;
+    }
+    submitWaitlist(email);
+    waitlistError.classList.add("hidden");
+    waitlistEmail.removeAttribute("aria-invalid");
+    waitlistForm.classList.add("hidden");
+    waitlistSuccess.classList.remove("hidden");
+  });
+</script>
+{% endblock %}
